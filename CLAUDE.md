@@ -11,6 +11,8 @@ in chat, with shop managers supervising and taking over. See `README.md` for the
 - Backend is .NET. Python only for AI-specific parts where .NET support is materially worse, behind a
   service boundary and justified in the plan.
 - Integrate with the shop only through its API, never its database.
+- Servers and software are managed only through version-controlled infrastructure as code; no manual
+  server changes, no committed secrets.
 - Assistant safety rules (catalog-only products, explicit order confirmation, no payment credentials,
   human handoff) are non-negotiable and each needs an automated test.
 

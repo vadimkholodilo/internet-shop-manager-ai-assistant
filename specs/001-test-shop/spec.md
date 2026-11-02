@@ -124,6 +124,7 @@ A developer can reset the shop to a clean state (no products, no orders) and re-
 - **FR-014**: The shop MUST provide a test payment method that produces a payment link or QR code per order and never charges real money.
 - **FR-015**: The shop MUST be resettable to a clean state without redeploying it, and re-seedable afterwards.
 - **FR-016**: Setup and operation (deploying, seeding, resetting, obtaining service credentials) MUST be documented in English.
+- **FR-017**: The test server and the shop software on it MUST be provisioned and configured entirely from version-controlled code, so the whole environment can be rebuilt from the repository without manual steps on the server.
 
 ### Key Entities
 

@@ -32,7 +32,8 @@ Not planned yet: voice messages, returns, manager analytics, telephony.
 
 The binding rules are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md). In short:
 .NET-first backend (Python only where AI tooling is materially better), API-only shop integration, a safe
-and grounded assistant, humans in the loop, tested AI behavior, and small incremental slices.
+and grounded assistant, humans in the loop, tested AI behavior, small incremental slices, and
+infrastructure managed only as code.
 
 ## Language policy
 

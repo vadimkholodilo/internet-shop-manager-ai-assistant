@@ -70,6 +70,17 @@ complexity MUST be justified in the plan.
 Rationale: a pet project with a public build-in-the-open series progresses best in small,
 demonstrable steps.
 
+### VIII. Infrastructure as Code
+
+All servers and the software running on them MUST be provisioned and configured through
+version-controlled infrastructure-as-code. Manual changes on servers are forbidden except for
+emergency fixes, which MUST be captured in code afterwards. Environments MUST be reproducible
+from the repository, and secrets MUST NOT be committed. The choice of IaC tooling is made in the
+implementation plan.
+
+Rationale: publicly hosted environments must be rebuildable, reviewable, and free of undocumented
+manual state; this also supports the shop's reset and re-seed requirement.
+
 ## Technology and Integration Constraints
 
 - Backend stack is governed by Principle I; shop integration by Principle II.
@@ -95,4 +106,4 @@ added principles or materially expanded guidance, PATCH for clarifications and w
 reviews MUST verify compliance with the principles, with Principle III checked on every change
 that touches assistant behaviour.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-02
+**Version**: 1.1.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-02
