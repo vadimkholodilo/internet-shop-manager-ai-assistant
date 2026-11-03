@@ -23,12 +23,55 @@ Development is spec-driven ([Spec Kit](https://github.com/github/spec-kit)). Eac
 
 | # | Feature | Status | Depends on |
 |---|---------|--------|------------|
-| 001 | [Test electronics shop](specs/001-test-shop/spec.md): OpenCart shop, product snapshot, API loader, order API | Specified | none |
+| 001 | [Test electronics shop](specs/001-test-shop/spec.md): OpenCart in Docker, JSON product loader, generated sample catalog | Implemented | none |
 
-Next, once 001 is done: the shop AI assistant (product search, ordering, order tracking, handoff, ratings).
+Next, once 001 is done: the shop connector, public address, order API and a larger catalog, then the shop AI assistant (product search, ordering, order tracking, handoff, ratings).
 Features are specified one at a time.
 
 Not planned yet: voice messages, returns, manager analytics, telephony.
+
+## Try the test shop
+
+The test shop is an OpenCart electronics store in Russian, seeded with a generated sample catalog. The only
+prerequisite is Docker with the Compose plugin.
+
+```bash
+cp .env.example .env      # optional, the defaults work as they are
+docker-compose up -d
+```
+
+`up -d` returns once the shop is healthy; the loader then fills it in about 10 seconds
+(`docker-compose logs -f loader`, it exits with code 0 when done). Then open <http://localhost:8080>.
+Running the command again changes nothing: the loader updates existing items and never duplicates them.
+
+| What | Where |
+|------|-------|
+| Storefront | <http://localhost:8080> (change the port with `SHOP_PORT` in `.env`) |
+| Administration | <http://localhost:8080/admin> (`admin` / `admin` by default, see `.env`) |
+| Catalog API | `http://localhost:8080/catalog-api/...`, `Authorization: Bearer <SHOP_API_KEY>` |
+
+If the port is already taken, Docker reports `port is already allocated`; set another `SHOP_PORT` in `.env`.
+Stop with `docker-compose down`, or `docker-compose down -v` to also delete the shop's data.
+
+**Loading your own catalog.** Put a product file (format in [`data/README.md`](data/README.md)) and its images
+anywhere and run the loader against the running shop:
+
+```bash
+dotnet run --project src/ShopLoader -- --file my-catalog.json --url http://localhost:8080 --api-key local-demo-api-key-change-me
+```
+
+**Development.** The development override also publishes the database port, so tools can run on your machine:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d   # shop :8080, database :3306
+```
+
+The loader is a Native AOT .NET 10 program; `dotnet run` works with the .NET 10 SDK, and the Docker build
+produces the AOT binary. Tests: `dotnet test` runs unit tests and integration tests, which start real OpenCart
+and MariaDB containers with Testcontainers (Docker required, the first run builds the images).
+`tools/smoke-test.sh` runs the real `docker compose up -d` demo and checks the result.
+
+How it is built is described in [`specs/001-test-shop/`](specs/001-test-shop/plan.md).
 
 ## Principles
 
