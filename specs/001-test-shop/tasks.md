@@ -126,7 +126,7 @@ Paths follow plan.md: `shop/` (image and extension), `src/ShopLoader/`, `tests/S
 - [X] T035 [P] [US5] Add a smoke integration test in `tests/ShopLoader.IntegrationTests/SampleDemoTests.cs` that runs the Native AOT loader binary from the loader image (not `dotnet run`) against the test shop
 - [X] T036 [US5] Check every acceptance scenario of User Story 2 has a matching integration test (SC-007), and that tests are independent of order and leave no containers behind
 - [X] T037 [US5] Update `.github/workflows/tests.yml` (job stays named `tests`): set up .NET 10, run `dotnet build`, the unit tests, the integration tests, and `tools/smoke-test.sh` (the Native AOT loader is built inside the loader image, so no clang is needed on the runner); the "no solution yet" fallback is removed now that a solution exists
-- [ ] T038 [US5] Open a PR from a test branch to confirm the `tests` check passes in GitHub Actions with Docker and fix any issues
+- [X] T038 [US5] Open a PR from a test branch to confirm the `tests` check passes in GitHub Actions with Docker and fix any issues
 
 ---
 
