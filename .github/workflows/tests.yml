@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
 
       # Runs the whole automated suite (unit, integration and AI evaluation tests).
       # Until the first feature adds a solution there is nothing to test; the job still
