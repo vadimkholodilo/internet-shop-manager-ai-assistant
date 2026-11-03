@@ -18,5 +18,5 @@ in chat, with shop managers supervising and taking over. See `README.md` for the
 
 ## Workflow
 
-Spec Kit, one feature per directory in `specs/` (`001-test-shop`, `002-shop-ai-assistant`). Feature 002
-depends on 001.
+Spec Kit, one feature per directory in `specs/`, one feature at a time. Currently only `001-test-shop`;
+the AI assistant feature is added after it.

@@ -24,7 +24,9 @@ Development is spec-driven ([Spec Kit](https://github.com/github/spec-kit)). Eac
 | # | Feature | Status | Depends on |
 |---|---------|--------|------------|
 | 001 | [Test electronics shop](specs/001-test-shop/spec.md): OpenCart shop, product snapshot, API loader, order API | Specified | none |
-| 002 | [Shop AI assistant](specs/002-shop-ai-assistant/spec.md): product search, ordering, order tracking, handoff, ratings | Specified | 001 |
+
+Next, once 001 is done: the shop AI assistant (product search, ordering, order tracking, handoff, ratings).
+Features are specified one at a time.
 
 Not planned yet: voice messages, returns, manager analytics, telephony.
 

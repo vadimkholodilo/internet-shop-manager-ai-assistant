@@ -156,4 +156,4 @@ A developer can reset the shop to a clean state (no products, no orders) and re-
 - The catalog is electronics only, in Russian, with prices in rubles.
 - The product snapshot is collected once from a real electronics retailer's public catalog for testing only; scraping is a one-off step, not part of the running system.
 - Payments are stubbed: no payment provider is integrated and no real money moves.
-- Out of scope: real payments, real delivery integrations, production hardening, and the AI assistant itself (feature `002-shop-ai-assistant`, which depends on this feature).
+- Out of scope: real payments, real delivery integrations, production hardening, and the AI assistant itself (a later feature that will depend on this one).
