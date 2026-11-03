@@ -1,12 +1,12 @@
 # Contract: Catalog Upsert Endpoint (OpenCart extension)
 
 Internal contract between the loader and the `catalog_api` OpenCart extension. It is shop-specific by
-design; the shop-neutral connector contract comes in a later feature. Exact route is **to be confirmed**
-during implementation (see research R1).
+design; the shop-neutral connector contract comes in a later feature. The extension answers under
+`/catalog-api/` (an Apache rewrite to the controller route `catalog_api/api`, see research R1).
 
 ## Authentication
 
-`Authorization: Bearer <api key>`. The key is created at first start from `SHOP_API_KEY`
+`Authorization: Bearer <api key>`. The key is the shop container's `SHOP_API_KEY` environment variable
 (non-secret default for local use in `.env.example`). Missing or wrong key returns `401` and changes nothing.
 
 ## Identifiers

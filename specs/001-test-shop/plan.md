@@ -72,20 +72,26 @@ specs/001-test-shop/
 ### Source Code (repository root)
 
 ```text
-docker-compose.yml            # opencart, mariadb, loader (default, no db port exposed)
-docker-compose.dev.yml        # dev override: exposes shop and database ports
+docker-compose.yml            # db, shop, loader (default; the database port is not published)
+docker-compose.dev.yml        # dev override: also publishes the database port
 .env.example                  # non-secret local defaults
 shop/
-├── Dockerfile                # OpenCart built from a pinned release, plus our extension
-├── entrypoint.sh             # unattended install and extension activation, idempotent
-└── extension/catalog_api/    # PHP extension: authenticated catalog upsert endpoint
+├── Dockerfile                # OpenCart 4.1.0.4 on php:8.2-apache, plus our extension and Russian strings
+├── entrypoint.sh             # unattended install, idempotent
+├── provision.sh              # Russian, rubles, demo catalog removal
+├── apache/opencart.conf      # /catalog-api rewrite, Authorization header, SHOP_API_KEY
+├── php/opencart.ini
+├── language/                 # Russian strings overlaid on the en-gb copy at build time
+└── catalog_api/controller/api.php   # PHP extension: authenticated catalog REST endpoint
 data/
 ├── sample-catalog.json       # generated Russian sample catalog
+├── README.md                 # file format
 └── images/                   # generated placeholder photos
-src/ShopLoader/               # .NET console loader (reads JSON, calls the endpoint)
+src/ShopLoader/               # .NET 10 Native AOT console loader (+ Dockerfile)
 tests/ShopLoader.UnitTests/
 tests/ShopLoader.IntegrationTests/   # Testcontainers, real OpenCart and MariaDB
-tools/generate-sample/        # script that generates the sample catalog
+tools/generate-sample/generate.cs    # generates the sample catalog and photos
+tools/smoke-test.sh           # runs the real `docker compose up -d` demo and checks it
 ```
 
 **Structure Decision**: One .NET solution at the root with the loader and two test projects. Shop

@@ -1,6 +1,6 @@
 # Research: Test Electronics Shop (Local Demo)
 
-Web searches in this phase were shallow; items marked **Verify** must be confirmed during implementation.
+Items marked **Resolved** were settled by experiment during implementation (OpenCart 4.1.0.4, PHP 8.2, MariaDB 11.4).
 
 ## R1. How to write catalog data through an API
 
@@ -16,8 +16,14 @@ Web searches in this phase were shallow; items marked **Verify** must be confirm
 - **Alternatives considered**: Driving the admin UI with form posts (rejected: fragile, token handling,
   many form fields); A marketplace "Dynamic API" extension exposing models (unverified for
   OpenCart 4, third party); the Webkul REST add-ons (commercial, marketplace-oriented); direct SQL (forbidden by the constitution).
-- **Verify**: Whether OpenCart 4's admin models can be loaded safely from a catalog-side controller, or
-  whether the extension must register as an admin-side route with API-key authentication.
+- **Resolved**: The extension is a catalog-side controller (`catalog/controller/catalog_api/api.php`, route
+  `catalog_api/api`, exposed as `/catalog-api/...` by an Apache rewrite). It registers the `Opencart\Admin`
+  namespace with the autoloader and pre-registers the admin models (`design/seo_url`, `catalog/category`,
+  `catalog/product`, `catalog/manufacturer`, `catalog/attribute`, `catalog/attribute_group`) as the loader's
+  fallback objects, because admin models call each other through `$this->load->model()` and would otherwise
+  resolve same-named catalog models. Authentication is a bearer token compared with `SHOP_API_KEY` (passed
+  to PHP with Apache `PassEnv`). Writes run in a database transaction and roll back on any error. The SKU is
+  stored in the product's `model` field and the category slug as its SEO keyword.
 
 ## R2. Getting an OpenCart image
 
@@ -26,7 +32,8 @@ Web searches in this phase were shallow; items marked **Verify** must be confirm
   A pinned build keeps the demo reproducible and lets us bake in the extension.
 - **Alternatives considered**: `bitnami/opencart` (deprecated); `byjg/opencart` (OpenCart 3.x, no
   releases); a community image (unclear maintenance).
-- **Verify**: The exact release and PHP version pair; OpenCart's CLI installer for unattended setup.
+- **Resolved**: OpenCart 4.1.0.4 on `php:8.2-apache` (the pair upstream's own Dockerfile uses). The CLI installer
+  `install/cli_install.php install ...` works unattended.
 
 ## R3. Unattended installation
 
@@ -41,7 +48,12 @@ Web searches in this phase were shallow; items marked **Verify** must be confirm
 
 - **Decision**: Install the Russian language pack, set it as the default, and set the default currency to RUB
   during first-run configuration.
-- **Verify**: Whether the language pack ships with OpenCart 4 or must be fetched and pinned.
+- **Resolved**: The installer only ships `en-gb` and `fr-fr`, and no maintained OpenCart 4 Russian pack exists.
+  The image copies every `en-gb` language directory to `ru-ru` and overlays Russian strings for the pages a
+  shopper sees (`shop/language/ru-translations.php`, applied at build time by `shop/language/apply.php`);
+  untranslated keys stay English. Provisioning renames the single installed language to `ru-ru`, enables only
+  the RUB currency (no decimals, symbol after the amount), translates stock statuses and the page title, and
+  removes OpenCart's English demo catalog once.
 
 ## R5. Loader language and shape
 
@@ -50,8 +62,9 @@ Web searches in this phase were shallow; items marked **Verify** must be confirm
 - **Rationale**: Constitution Principle I; the same code is reused by the connector later.
 - **Alternatives considered**: Python script (not justified by Principle I); reflection-based JSON, CLI or
   schema-validation libraries (break or bloat Native AOT, so they are avoided).
-- **Verify**: Every dependency is AOT-compatible and the build has no trim or AOT warnings
-  (`TreatWarningsAsErrors` for IL warnings).
+- **Resolved**: No dependencies beyond the framework; the build has no trim or AOT warnings
+  (`TreatWarningsAsErrors`). The binary is built in the Docker image; linking on a Homebrew .NET host on macOS
+  fails with `library 'ssl' not found`, so development there uses `dotnet run`.
 
 ## R5a. Native AOT scope
 
@@ -62,7 +75,7 @@ Web searches in this phase were shallow; items marked **Verify** must be confirm
   install.
 - **Alternatives considered**: Framework-dependent publish (larger image, slower start); AOT for tests (not
   possible with xUnit and Testcontainers, which use reflection, so tests use the normal runtime).
-- **Verify**: A smoke test in the integration tests runs the published AOT binary, not only `dotnet run`.
+- **Resolved**: An integration test runs the loader image (the AOT binary) as a container against the test shop.
 
 ## R6. Readiness and ordering at start-up
 
@@ -77,8 +90,11 @@ Web searches in this phase were shallow; items marked **Verify** must be confirm
   (without the loader service) so tests exercise what readers run. Wait on the compose healthchecks. Each
   test class starts from a fresh stack or uses unique SKUs so tests do not depend on order.
 - **Rationale**: Spec User Story 5; works on `ubuntu-latest`, where Docker is available.
-- **Verify**: Cost of one OpenCart start per test class; if too slow, share a fixture per run and isolate
-  tests with unique SKUs.
+- **Resolved**: Testcontainers' `ComposeBuilder` runs `docker compose` inside a container and cannot build our
+  local build contexts, so the tests use Testcontainers' image and container builders with the repository's own
+  Dockerfiles (`shop/Dockerfile`, `src/ShopLoader/Dockerfile`) and the same environment as `docker-compose.yml`.
+  The real `docker compose up -d` path is covered by `tools/smoke-test.sh`, run in CI. One OpenCart install takes
+  about 10 seconds, so one stack is shared per test run and tests isolate themselves with unique SKUs.
 
 ## R8. Sample data and photos
 
