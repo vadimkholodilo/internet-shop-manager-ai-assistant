@@ -1,0 +1,13 @@
+# Development override: expose the external services on the local machine so the loader and later
+# services can run and be debugged outside containers.
+#
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# The default configuration does not depend on this file and never publishes the database port.
+services:
+  db:
+    ports:
+      - "${SHOP_DB_PORT:-3306}:3306"
+  shop:
+    ports:
+      - "${SHOP_PORT:-8080}:80"
