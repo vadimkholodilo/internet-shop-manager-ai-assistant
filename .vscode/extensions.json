@@ -6,7 +6,8 @@
     "ms-azuretools.vscode-docker",
     "editorconfig.editorconfig",
     "github.vscode-github-actions",
-    "github.vscode-pull-request-github"
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens"
   ],
   "unwantedRecommendations": [
     "felixfbecker.php-intellisense"
