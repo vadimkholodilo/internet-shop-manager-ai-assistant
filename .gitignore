@@ -430,3 +430,6 @@ FodyWeavers.xsd
 # Local shop configuration
 .env
 !.env.example
+
+# OpenCart source for editor intellisense (tools/fetch-opencart-source.sh)
+.opencart/
