@@ -18,13 +18,12 @@ RUN curl -fsSL -o /tmp/opencart.zip \
     && rm -rf /tmp/opencart /tmp/opencart.zip /var/www/html/index.html
 
 # Russian language: start from a copy of every en-gb language directory (so no key is ever missing), then
-# overlay the community Russian pack (https://github.com/ruOpenCart/opencart-language-russian-4), pinned by
-# version and checksum. Only its translation files are used; its extension code (an admin updater) is not.
-ARG RU_PACK_VERSION=4.1.0.4.RE8
+# overlay the community Russian pack (see language/README.md), committed to the repo so the build does not
+# depend on GitHub. The checksum guards against the file being changed by accident. Only its translation
+# files are used; its extension code (an admin updater) is not.
 ARG RU_PACK_SHA256=c9ac8a5b40294e3a239e0421b3a81064454a6a43e76b0149694d313f8767a1e8
+COPY language/ocn_language_russian.ocmod.zip /tmp/ru.zip
 RUN find /var/www/html -type d -name en-gb -path '*language*' | while read -r d; do cp -a "$d" "$(dirname "$d")/ru-ru"; done \
-    && curl -fsSL -o /tmp/ru.zip \
-        "https://github.com/ruOpenCart/opencart-language-russian-4/releases/download/${RU_PACK_VERSION}/ocn_language_russian.ocmod.zip" \
     && echo "${RU_PACK_SHA256}  /tmp/ru.zip" | sha256sum -c - \
     && unzip -q /tmp/ru.zip -d /tmp/ru \
     && for app in catalog admin; do \
