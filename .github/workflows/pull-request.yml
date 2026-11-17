@@ -54,6 +54,10 @@ jobs:
       - name: Format check
         run: dotnet format InternetShop.slnx --verify-no-changes --no-restore
 
+      # Syntax check of the OpenCart extension's PHP on the PHP version the shop image runs; no OpenCart sources needed.
+      - name: PHP syntax check
+        run: tools/lint-php.sh
+
       - name: Unit tests
         run: dotnet test tests/ShopLoader.UnitTests --configuration Release --no-build
 
