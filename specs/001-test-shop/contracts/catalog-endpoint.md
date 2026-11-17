@@ -1,8 +1,8 @@
 # Contract: Catalog Upsert Endpoint (OpenCart extension)
 
-Internal contract between the loader and the `catalog_api` OpenCart extension. It is shop-specific by
+Internal contract between the loader and the `internet_shop` OpenCart extension. It is shop-specific by
 design; the shop-neutral connector contract comes in a later feature. The extension answers under
-`/catalog-api/` (an Apache rewrite to the controller route `catalog_api/api`, see research R1).
+`/catalog-api/` (an Apache rewrite to the controller route `extension/internet_shop/api`, see research R1).
 
 ## Authentication
 

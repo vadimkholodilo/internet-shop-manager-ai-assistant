@@ -1,5 +1,5 @@
 <?php
-namespace Opencart\Catalog\Controller\CatalogApi;
+namespace Opencart\Catalog\Controller\Extension\InternetShop;
 
 /**
  * Catalog REST API for OpenCart.

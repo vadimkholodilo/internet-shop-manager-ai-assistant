@@ -433,3 +433,6 @@ FodyWeavers.xsd
 
 # OpenCart source for editor intellisense (tools/fetch-opencart-source.sh)
 .opencart/
+
+# Extension package built by tools/package-extension.sh
+dist/

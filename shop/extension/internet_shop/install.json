@@ -1,0 +1,7 @@
+{
+  "name": "Internet Shop AI Assistant",
+  "description": "Catalog REST API (and later the chat widget) for the internet shop manager AI assistant.",
+  "version": "1.0.0",
+  "author": "internet-shop-manager-ai-assistant",
+  "link": "https://github.com/vadimkholodilo/internet-shop-manager-ai-assistant"
+}
