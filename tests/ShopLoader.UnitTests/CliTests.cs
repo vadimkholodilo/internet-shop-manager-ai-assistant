@@ -14,13 +14,26 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
-    public async Task NoArgumentsPrintsUsage()
+    public async Task NoArgumentsReportsWhatIsMissing()
     {
         var (exit, error) = await Run();
 
         Assert.Equal(2, exit);
-        Assert.Contains("--file is required", error);
-        Assert.Contains("Usage:", error);
+        Assert.Contains("--file", error);
+        Assert.Contains("--url", error);
+        Assert.Contains("--help", error);
+    }
+
+    [Fact]
+    public async Task HelpPrintsUsageAndSucceeds()
+    {
+        var output = new StringWriter();
+
+        var exit = await Cli.RunAsync(["--help"], output, new StringWriter());
+
+        Assert.Equal(0, exit);
+        Assert.Contains("Usage:", output.ToString());
+        Assert.Contains("--wait-seconds", output.ToString());
     }
 
     [Theory]
@@ -40,7 +53,25 @@ public sealed class CliTests : IDisposable
         var (exit, error) = await Run("--file", "x.json", "--url", "http://shop", "--api-key", "k", "--colour", "red");
 
         Assert.Equal(2, exit);
-        Assert.Contains("Unknown option: --colour", error);
+        Assert.Contains("--colour", error);
+    }
+
+    [Fact]
+    public async Task ApiKeyIsRequiredWhenNeitherOptionNorEnvironmentProvidesIt()
+    {
+        var saved = Environment.GetEnvironmentVariable("SHOP_API_KEY");
+        Environment.SetEnvironmentVariable("SHOP_API_KEY", null);
+        try
+        {
+            var (exit, error) = await Run("--file", "x.json", "--url", "http://shop");
+
+            Assert.Equal(2, exit);
+            Assert.Contains("SHOP_API_KEY", error);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("SHOP_API_KEY", saved);
+        }
     }
 
     [Fact]
@@ -75,10 +106,12 @@ public sealed class CliTests : IDisposable
         Assert.Contains("did not become ready", error);
     }
 
-    [Fact]
-    public async Task WaitSecondsMustBeANumber()
+    [Theory]
+    [InlineData("soon")]
+    [InlineData("-1")]
+    public async Task WaitSecondsMustBeANonNegativeNumber(string value)
     {
-        var (exit, error) = await Run("--file", "x.json", "--url", "http://shop", "--api-key", "k", "--wait-seconds", "soon");
+        var (exit, error) = await Run("--file", "x.json", "--url", "http://shop", "--api-key", "k", "--wait-seconds", value);
 
         Assert.Equal(2, exit);
         Assert.Contains("--wait-seconds", error);

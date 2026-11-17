@@ -17,7 +17,7 @@ the same compose files and real containers.
 
 **Language/Version**: C# on .NET 10 (loader, tests); PHP (OpenCart extension, required by the platform)
 
-**Primary Dependencies**: OpenCart 4.x (built from a pinned release), MariaDB, Testcontainers for .NET, xUnit. The loader uses only AOT-compatible libraries: `System.Text.Json` with source generation, `HttpClient`, and hand-written argument parsing and validation (no reflection-based libraries).
+**Primary Dependencies**: OpenCart 4.x (built from a pinned release), MariaDB, Testcontainers for .NET, xUnit. The loader uses only AOT-compatible libraries: `System.Text.Json` with source generation, `HttpClient`, `System.CommandLine` for argument parsing (trim and AOT compatible), and hand-written product-file validation (no reflection-based libraries).
 
 **Storage**: MariaDB, owned by OpenCart; the loader never connects to it
 

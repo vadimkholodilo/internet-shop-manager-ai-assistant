@@ -17,4 +17,8 @@
     <InternalsVisibleTo Include="ShopLoader.IntegrationTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="3.0.0" />
+  </ItemGroup>
+
 </Project>

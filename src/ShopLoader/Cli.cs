@@ -1,3 +1,4 @@
+using System.CommandLine;
 using ShopLoader.OpenCart;
 using ShopLoader.Validation;
 
@@ -6,25 +7,96 @@ namespace ShopLoader;
 /// <summary>Command line entry point. Exit codes: 0 loaded, 1 some records failed, 2 file or usage problem or shop unavailable.</summary>
 internal static class Cli
 {
-    private const string Usage = """
-        Usage: shop-loader --file <catalog.json> --url <shop url> [--api-key <key>] [--images-dir <dir>] [--wait-seconds <n>]
-
-          --file          product file in the documented JSON format
-          --url           address of the shop, e.g. http://localhost:8080
-          --api-key       API key of the shop (default: SHOP_API_KEY environment variable)
-          --images-dir    directory the product image paths are relative to (default: "images" next to the file)
-          --wait-seconds  how long to wait for the shop to become ready (default: 300)
-        """;
-
     public static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error, CancellationToken cancellationToken = default)
     {
-        if (!TryParse(args, out var options, out var problem))
+        var file = new Option<string>("--file") { Description = "product file in the documented JSON format", Required = true };
+        var url = new Option<Uri>("--url")
         {
-            error.WriteLine(problem);
-            error.WriteLine(Usage);
+            Description = "address of the shop, e.g. http://localhost:8080",
+            Required = true,
+            CustomParser = ParseHttpUrl,
+        };
+        var apiKey = new Option<string?>("--api-key")
+        {
+            Description = "API key of the shop (default: SHOP_API_KEY environment variable)",
+            DefaultValueFactory = _ => Environment.GetEnvironmentVariable("SHOP_API_KEY"),
+        };
+        var imagesDirectory = new Option<string?>("--images-dir")
+        {
+            Description = "directory the product image paths are relative to (default: \"images\" next to the file)",
+        };
+        var waitSeconds = new Option<int>("--wait-seconds")
+        {
+            Description = "how long to wait for the shop to become ready",
+            DefaultValueFactory = _ => 300,
+            CustomParser = ParseSeconds,
+        };
+
+        var root = new RootCommand("Loads a product file into the shop through its catalog API.")
+        {
+            file, url, apiKey, imagesDirectory, waitSeconds,
+        };
+        const string MissingApiKey = "--api-key or SHOP_API_KEY is required";
+        root.SetAction((parsed, token) =>
+        {
+            var key = parsed.GetValue(apiKey);
+            if (string.IsNullOrEmpty(key))
+            {
+                error.WriteLine(MissingApiKey);
+                return Task.FromResult(2);
+            }
+
+            return LoadAsync(
+                new Options(parsed.GetRequiredValue(file), parsed.GetRequiredValue(url), key, parsed.GetValue(imagesDirectory), parsed.GetValue(waitSeconds)),
+                output, error, token);
+        });
+
+        var parseResult = root.Parse(args);
+        if (parseResult.Errors.Count > 0)
+        {
+            foreach (var problem in parseResult.Errors)
+            {
+                error.WriteLine(problem.Message);
+            }
+            if (string.IsNullOrEmpty(parseResult.GetValue(apiKey)))
+            {
+                error.WriteLine(MissingApiKey);
+            }
+            error.WriteLine("Run with --help for usage.");
             return 2;
         }
 
+        return await parseResult.InvokeAsync(new InvocationConfiguration { Output = output, Error = error }, cancellationToken);
+    }
+
+    private sealed record Options(string File, Uri Url, string ApiKey, string? ImagesDirectory, int WaitSeconds);
+
+    private static Uri? ParseHttpUrl(System.CommandLine.Parsing.ArgumentResult result)
+    {
+        var text = result.Tokens.Count == 1 ? result.Tokens[0].Value : null;
+        if (text is not null && Uri.TryCreate(text, UriKind.Absolute, out var url) &&
+            (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps))
+        {
+            return url;
+        }
+
+        result.AddError("--url is required and must be an http(s) address");
+        return null;
+    }
+
+    private static int ParseSeconds(System.CommandLine.Parsing.ArgumentResult result)
+    {
+        if (result.Tokens.Count == 1 && int.TryParse(result.Tokens[0].Value, out var seconds) && seconds >= 0)
+        {
+            return seconds;
+        }
+
+        result.AddError("--wait-seconds must be a number of seconds, 0 or more");
+        return 0;
+    }
+
+    private static async Task<int> LoadAsync(Options options, TextWriter output, TextWriter error, CancellationToken cancellationToken)
+    {
         var imagesDirectory = options.ImagesDirectory ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.File))!, "images");
 
         ValidationResult validation;
@@ -52,54 +124,5 @@ internal static class Cli
             error.WriteLine(e.Message);
             return 2;
         }
-    }
-
-    private sealed record Options(string File, Uri Url, string ApiKey, string? ImagesDirectory, int WaitSeconds);
-
-    private static bool TryParse(string[] args, out Options options, out string problem)
-    {
-        options = null!;
-        problem = "";
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        for (var i = 0; i < args.Length; i++)
-        {
-            if (!args[i].StartsWith("--", StringComparison.Ordinal) || i + 1 >= args.Length)
-            {
-                problem = $"Unexpected argument: {args[i]}";
-                return false;
-            }
-            values[args[i][2..]] = args[++i];
-        }
-
-        foreach (var name in values.Keys)
-        {
-            if (name is not ("file" or "url" or "api-key" or "images-dir" or "wait-seconds"))
-            {
-                problem = $"Unknown option: --{name}";
-                return false;
-            }
-        }
-
-        if (!values.TryGetValue("file", out var file)) { problem = "--file is required"; return false; }
-        if (!values.TryGetValue("url", out var url) || !Uri.TryCreate(url, UriKind.Absolute, out var shopUrl) ||
-            (shopUrl.Scheme != Uri.UriSchemeHttp && shopUrl.Scheme != Uri.UriSchemeHttps))
-        {
-            problem = "--url is required and must be an http(s) address";
-            return false;
-        }
-
-        var apiKey = values.GetValueOrDefault("api-key") ?? Environment.GetEnvironmentVariable("SHOP_API_KEY");
-        if (string.IsNullOrEmpty(apiKey)) { problem = "--api-key or SHOP_API_KEY is required"; return false; }
-
-        var wait = 300;
-        if (values.TryGetValue("wait-seconds", out var waitText) && (!int.TryParse(waitText, out wait) || wait < 0))
-        {
-            problem = "--wait-seconds must be a number of seconds, 0 or more";
-            return false;
-        }
-
-        options = new Options(file, shopUrl, apiKey, values.GetValueOrDefault("images-dir"), wait);
-        return true;
     }
 }
