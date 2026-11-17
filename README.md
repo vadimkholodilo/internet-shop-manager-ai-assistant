@@ -73,6 +73,9 @@ produces the AOT binary. Tests: `dotnet test` runs unit tests and integration te
 and MariaDB containers with Testcontainers (Docker required, the first run builds the images).
 `tools/smoke-test.sh` runs the real `docker compose up -d` demo and checks the result.
 
+CI checks formatting with `dotnet format --verify-no-changes`. A pre-commit hook formats the staged C# files for
+you; enable it once per clone with `git config core.hooksPath .githooks`.
+
 How it is built is described in [`specs/001-test-shop/`](specs/001-test-shop/plan.md).
 
 ## Principles
