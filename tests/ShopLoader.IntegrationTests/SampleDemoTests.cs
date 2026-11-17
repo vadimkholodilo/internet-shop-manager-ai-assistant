@@ -62,12 +62,12 @@ public sealed class SampleDemoTests(ShopStack shop)
 
         Assert.Contains("Смартфон Norda Pulse 5 128 ГБ", page);
         Assert.Contains("24 990 ₽", page);
-        Assert.Contains("Сортировка", page);
+        Assert.Contains("Сортировать по", page);
         Assert.Contains("/image/cache/catalog/products/ph-001", page);
 
         var product = (await shop.Http.ProductAsync("PH-001"))!;
         var details = await storefront.GetStringAsync($"index.php?route=product/product&language=ru-ru&product_id={product["id"]}");
-        Assert.Contains("Производитель", details);
+        Assert.Contains("Бренд:", details);
         Assert.Contains("Norda", details);
         Assert.Contains("Диагональ экрана", details);
         Assert.Contains("В наличии", details);

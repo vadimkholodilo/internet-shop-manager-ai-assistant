@@ -81,7 +81,6 @@ shop/
 ├── provision.sh              # Russian, rubles, demo catalog removal
 ├── apache/opencart.conf      # /catalog-api rewrite, Authorization header, SHOP_API_KEY
 ├── php/opencart.ini
-├── language/                 # Russian strings overlaid on the en-gb copy at build time
 └── extension/ai_assistant/     # OpenCart extension (install.json, admin module, catalog controller)
     └── catalog/controller/api.php   # authenticated catalog REST endpoint
 data/

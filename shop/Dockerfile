@@ -17,11 +17,23 @@ RUN curl -fsSL -o /tmp/opencart.zip \
     && cp -a /tmp/opencart/upload/. /var/www/html/ \
     && rm -rf /tmp/opencart /tmp/opencart.zip /var/www/html/index.html
 
-# Russian language: start from a copy of every en-gb language directory (so no key is ever missing),
-# then overlay the translated files from shop/language/.
-RUN find /var/www/html -type d -name en-gb -path '*language*' | while read -r d; do cp -a "$d" "$(dirname "$d")/ru-ru"; done
-COPY language /tmp/language
-RUN php /tmp/language/apply.php /var/www/html /tmp/language/ru-translations.php && rm -rf /tmp/language
+# Russian language: start from a copy of every en-gb language directory (so no key is ever missing), then
+# overlay the community Russian pack (https://github.com/ruOpenCart/opencart-language-russian-4), pinned by
+# version and checksum. Only its translation files are used; its extension code (an admin updater) is not.
+ARG RU_PACK_VERSION=4.1.0.4.RE8
+ARG RU_PACK_SHA256=c9ac8a5b40294e3a239e0421b3a81064454a6a43e76b0149694d313f8767a1e8
+RUN find /var/www/html -type d -name en-gb -path '*language*' | while read -r d; do cp -a "$d" "$(dirname "$d")/ru-ru"; done \
+    && curl -fsSL -o /tmp/ru.zip \
+        "https://github.com/ruOpenCart/opencart-language-russian-4/releases/download/${RU_PACK_VERSION}/ocn_language_russian.ocmod.zip" \
+    && echo "${RU_PACK_SHA256}  /tmp/ru.zip" | sha256sum -c - \
+    && unzip -q /tmp/ru.zip -d /tmp/ru \
+    && for app in catalog admin; do \
+         cp -a "/tmp/ru/$app/language/ru-ru/." "/var/www/html/$app/language/ru-ru/" \
+         && rm -rf "/var/www/html/$app/language/ru-ru/extension/opencart" \
+         && cp -a "/tmp/ru/$app/language/ru-ru/extension/opencart/." "/var/www/html/extension/opencart/$app/language/ru-ru/"; \
+       done \
+    && rm -rf /tmp/ru /tmp/ru.zip \
+    && sed -i -e "s/'Brand:'/'Бренд:'/" -e "s/'Product Code:'/'Артикул:'/" /var/www/html/catalog/language/ru-ru/product/product.php
 
 COPY apache/opencart.conf /etc/apache2/conf-enabled/opencart.conf
 COPY php/opencart.ini /usr/local/etc/php/conf.d/opencart.ini

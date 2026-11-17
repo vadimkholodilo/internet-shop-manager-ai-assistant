@@ -52,10 +52,12 @@ Items marked **Resolved** were settled by experiment during implementation (Open
 
 - **Decision**: Install the Russian language pack, set it as the default, and set the default currency to RUB
   during first-run configuration.
-- **Resolved**: The installer only ships `en-gb` and `fr-fr`, and no maintained OpenCart 4 Russian pack exists.
-  The image copies every `en-gb` language directory to `ru-ru` and overlays Russian strings for the pages a
-  shopper sees (`shop/language/ru-translations.php`, applied at build time by `shop/language/apply.php`);
-  untranslated keys stay English. Provisioning renames the single installed language to `ru-ru`, enables only
+- **Resolved**: The installer only ships `en-gb` and `fr-fr`. The community pack
+  `ruOpenCart/opencart-language-russian-4` has tagged releases for OpenCart 4.1.0.4 (no license file; it is
+  downloaded at build time, never committed). The image copies every `en-gb` language directory to `ru-ru`,
+  then overlays the pack's translation files, pinned by release tag and sha256 in `shop/Dockerfile`. Only
+  the translation files are used, not the pack's extension code (it contains a GitHub self-updater); a key
+  the pack lacks stays English. Provisioning renames the single installed language to `ru-ru`, enables only
   the RUB currency (no decimals, symbol after the amount), translates stock statuses and the page title, and
   removes OpenCart's English demo catalog once.
 
