@@ -35,6 +35,25 @@ UPDATE oc_user_group SET permission = JSON_ARRAY_APPEND(permission, '$.modify', 
   WHERE user_group_id = 1 AND NOT JSON_CONTAINS(JSON_EXTRACT(permission, '$.modify'), '"extension/ai_assistant/module/catalog_api"');
 SQL
 
+echo "[shop] removing demo banners and setting Russian store details"
+sql <<'SQL'
+DELETE FROM oc_layout_module WHERE code LIKE 'opencart.banner.%';
+DELETE FROM oc_module WHERE code = 'opencart.banner';
+DELETE FROM oc_banner_image;
+DELETE FROM oc_banner;
+UPDATE oc_setting SET value = '+7 (800) 000-00-00' WHERE `key` = 'config_telephone';
+UPDATE oc_setting SET value = 'Москва, ул. Примерная, д. 1' WHERE `key` = 'config_address';
+UPDATE oc_setting SET value = 'Ежедневно с 9:00 до 21:00' WHERE `key` = 'config_open';
+UPDATE oc_information_description SET title = 'О магазине', meta_title = 'О магазине',
+  description = '<p>Тестовый магазин электроники для демонстрации ИИ-ассистента.</p>' WHERE information_id = 1;
+UPDATE oc_information_description SET title = 'Условия использования', meta_title = 'Условия использования',
+  description = '<p>Это демонстрационный магазин: заказы не выполняются, платежи не принимаются.</p>' WHERE information_id = 2;
+UPDATE oc_information_description SET title = 'Политика конфиденциальности', meta_title = 'Политика конфиденциальности',
+  description = '<p>Демонстрационный магазин не собирает и не передаёт персональные данные.</p>' WHERE information_id = 3;
+UPDATE oc_information_description SET title = 'Доставка', meta_title = 'Доставка',
+  description = '<p>Доставка по России курьером или в пункты выдачи, сроки и стоимость зависят от региона.</p>' WHERE information_id = 4;
+SQL
+
 # OpenCart ships with an English demo catalog. Remove it once, so the shop contains only loaded data.
 if [ ! -f "$STATE/demo-catalog-removed" ]; then
     echo "[shop] removing the OpenCart demo catalog"

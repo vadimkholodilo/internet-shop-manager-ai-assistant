@@ -27,6 +27,7 @@ return [
         'text_contact' => 'Связаться с нами', 'text_return' => 'Возврат товара', 'text_sitemap' => 'Карта сайта',
         'text_manufacturer' => 'Производители', 'text_special' => 'Акции', 'text_account' => 'Личный кабинет',
         'text_order' => 'История заказов', 'text_wishlist' => 'Закладки',
+        'text_affiliate' => 'Партнёрская программа', 'text_newsletter' => 'Рассылка',
         'text_powered' => 'Работает на <a href="https://www.opencart.com">OpenCart</a><br/> %s &copy; %s',
     ],
     'common/cart' => [
@@ -62,5 +63,35 @@ return [
     ],
     'product/special' => [
         'heading_title' => 'Акции', 'text_no_results' => 'Нет товаров по акции.',
+    ],
+    'checkout/cart' => [
+        'heading_title' => 'Корзина', 'text_no_results' => 'Ваша корзина пуста!', 'text_model' => 'Артикул',
+        'column_image' => 'Фото', 'column_name' => 'Товар', 'column_quantity' => 'Количество',
+        'column_price' => 'Цена', 'column_total' => 'Итого',
+    ],
+    'account/login' => [
+        'heading_title' => 'Вход в личный кабинет', 'text_account' => 'Личный кабинет', 'text_login' => 'Вход',
+        'text_new_customer' => 'Новый покупатель', 'text_register' => 'Регистрация',
+        'text_returning_customer' => 'Постоянный покупатель', 'text_i_am_returning_customer' => 'Я уже зарегистрирован',
+        'text_forgotten' => 'Забыли пароль?', 'entry_email' => 'E-Mail', 'entry_password' => 'Пароль',
+    ],
+    'account/register' => [
+        'heading_title' => 'Регистрация', 'text_account' => 'Личный кабинет', 'text_register' => 'Регистрация',
+        'text_your_details' => 'Ваши данные', 'text_your_password' => 'Ваш пароль', 'text_newsletter' => 'Рассылка',
+        'entry_firstname' => 'Имя', 'entry_lastname' => 'Фамилия', 'entry_email' => 'E-Mail',
+        'entry_telephone' => 'Телефон', 'entry_newsletter' => 'Подписаться', 'entry_password' => 'Пароль',
+    ],
+    'information/contact' => [
+        'heading_title' => 'Контакты', 'text_location' => 'Наш адрес', 'text_contact' => 'Напишите нам',
+        'text_address' => 'Адрес', 'text_telephone' => 'Телефон', 'text_open' => 'Время работы',
+        'text_comment' => 'Комментарий', 'entry_name' => 'Ваше имя', 'entry_email' => 'E-Mail',
+        'entry_enquiry' => 'Сообщение',
+    ],
+    'information/sitemap' => [
+        'heading_title' => 'Карта сайта', 'text_special' => 'Акции', 'text_account' => 'Личный кабинет',
+        'text_edit' => 'Личные данные', 'text_password' => 'Пароль', 'text_address' => 'Адресная книга',
+        'text_history' => 'История заказов', 'text_download' => 'Загрузки', 'text_cart' => 'Корзина',
+        'text_checkout' => 'Оформление заказа', 'text_search' => 'Поиск', 'text_information' => 'Информация',
+        'text_contact' => 'Контакты',
     ],
 ];
