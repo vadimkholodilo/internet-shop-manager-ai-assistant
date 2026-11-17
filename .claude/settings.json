@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-code.sh",
+            "timeout": 180,
+            "statusMessage": "Checking that changed C# builds and PHP parses..."
+          }
+        ]
+      }
+    ]
+  }
+}
