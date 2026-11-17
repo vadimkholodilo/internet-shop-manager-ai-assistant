@@ -436,3 +436,6 @@ FodyWeavers.xsd
 
 # Extension package built by tools/package-extension.sh
 dist/
+
+# JetBrains Rider
+.idea/
