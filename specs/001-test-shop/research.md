@@ -111,5 +111,5 @@ Items marked **Resolved** were settled by experiment during implementation (Open
 
 ## R9. Continuous integration
 
-- **Decision**: Move `.github/workflows/tests.yml` to .NET 10 and extend it to build the solution, publish the loader with Native AOT, run unit tests, then run the
+- **Decision**: Move `.github/workflows/pull-request.yml` to .NET 10 and extend it to build the solution, publish the loader with Native AOT, run unit tests, then run the
   Testcontainers tests. The job stays named `tests` so branch protection keeps working.
