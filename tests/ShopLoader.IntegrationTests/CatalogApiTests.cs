@@ -98,7 +98,12 @@ public sealed class CatalogApiTests(ShopStack shop)
         await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{category}", new { name = "Для проверок" });
         object Product(object? price = null, int quantity = 1, string? cat = null) => new
         {
-            name = "Товар", category = cat ?? category, brand = "Бренд", description = "Описание", price = price ?? 100, quantity,
+            name = "Товар",
+            category = cat ?? category,
+            brand = "Бренд",
+            description = "Описание",
+            price = price ?? 100,
+            quantity,
         };
 
         Assert.Equal(HttpStatusCode.BadRequest, (await shop.Http.SendJsonAsync(HttpMethod.Put, "catalog-api/products/BAD-1", Product(price: 0))).Status);
