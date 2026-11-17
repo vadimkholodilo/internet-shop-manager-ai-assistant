@@ -50,7 +50,7 @@ Running the command again changes nothing: the loader updates existing items and
 | Administration | <http://localhost:8080/admin> (`admin` / `admin` by default, see `.env`) |
 | Catalog API | `http://localhost:8080/catalog-api/...`, `Authorization: Bearer <SHOP_API_KEY>` |
 
-The catalog API is an OpenCart extension in `shop/extension/internet_shop/`; `tools/package-extension.sh` builds `dist/internet_shop.ocmod.zip`, which a shop can install and update through Extensions > Installer.
+The catalog API is an OpenCart extension in `shop/extension/ai_assistant/`; `tools/package-extension.sh` builds `dist/ai_assistant.ocmod.zip`, which a shop can install and update through Extensions > Installer.
 
 If the port is already taken, Docker reports `port is already allocated`; set another `SHOP_PORT` in `.env`.
 Stop with `docker-compose down`, or `docker-compose down -v` to also delete the shop's data.

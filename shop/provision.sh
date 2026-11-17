@@ -24,15 +24,15 @@ UPDATE oc_stock_status SET name = 'Предзаказ' WHERE name = 'Pre-Order';
 UPDATE oc_stock_status SET name = '2-3 дня' WHERE name = '2-3 Days';
 SQL
 
-echo "[shop] registering the internet_shop extension"
+echo "[shop] registering the ai_assistant extension"
 sql <<'SQL'
 INSERT INTO oc_extension (extension, type, code)
-  SELECT 'internet_shop', 'module', 'catalog_api' FROM DUAL
-  WHERE NOT EXISTS (SELECT 1 FROM oc_extension WHERE extension = 'internet_shop' AND code = 'catalog_api');
-UPDATE oc_user_group SET permission = JSON_ARRAY_APPEND(permission, '$.access', 'extension/internet_shop/module/catalog_api')
-  WHERE user_group_id = 1 AND NOT JSON_CONTAINS(JSON_EXTRACT(permission, '$.access'), '"extension/internet_shop/module/catalog_api"');
-UPDATE oc_user_group SET permission = JSON_ARRAY_APPEND(permission, '$.modify', 'extension/internet_shop/module/catalog_api')
-  WHERE user_group_id = 1 AND NOT JSON_CONTAINS(JSON_EXTRACT(permission, '$.modify'), '"extension/internet_shop/module/catalog_api"');
+  SELECT 'ai_assistant', 'module', 'catalog_api' FROM DUAL
+  WHERE NOT EXISTS (SELECT 1 FROM oc_extension WHERE extension = 'ai_assistant' AND code = 'catalog_api');
+UPDATE oc_user_group SET permission = JSON_ARRAY_APPEND(permission, '$.access', 'extension/ai_assistant/module/catalog_api')
+  WHERE user_group_id = 1 AND NOT JSON_CONTAINS(JSON_EXTRACT(permission, '$.access'), '"extension/ai_assistant/module/catalog_api"');
+UPDATE oc_user_group SET permission = JSON_ARRAY_APPEND(permission, '$.modify', 'extension/ai_assistant/module/catalog_api')
+  WHERE user_group_id = 1 AND NOT JSON_CONTAINS(JSON_EXTRACT(permission, '$.modify'), '"extension/ai_assistant/module/catalog_api"');
 SQL
 
 # OpenCart ships with an English demo catalog. Remove it once, so the shop contains only loaded data.

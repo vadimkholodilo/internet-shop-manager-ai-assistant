@@ -1,5 +1,5 @@
 <?php
-namespace Opencart\Catalog\Controller\Extension\InternetShop;
+namespace Opencart\Catalog\Controller\Extension\AiAssistant;
 
 /**
  * Catalog REST API for OpenCart.

@@ -1,12 +1,12 @@
 <?php
-namespace Opencart\Admin\Controller\Extension\InternetShop\Module;
+namespace Opencart\Admin\Controller\Extension\AiAssistant\Module;
 /**
  * Catalog API module: Extensions > Modules registers the extension (see the install() hook of OpenCart's
  * module installer) so the catalog application autoloads it. The page only reports where the API lives.
  */
 class CatalogApi extends \Opencart\System\Engine\Controller {
     public function index(): void {
-        $this->load->language('extension/internet_shop/module/catalog_api');
+        $this->load->language('extension/ai_assistant/module/catalog_api');
 
         $this->document->setTitle($this->language->get('heading_title'));
 
@@ -24,7 +24,7 @@ class CatalogApi extends \Opencart\System\Engine\Controller {
 
         $data['breadcrumbs'][] = [
             'text' => $this->language->get('heading_title'),
-            'href' => $this->url->link('extension/internet_shop/module/catalog_api', 'user_token=' . $this->session->data['user_token'])
+            'href' => $this->url->link('extension/ai_assistant/module/catalog_api', 'user_token=' . $this->session->data['user_token'])
         ];
 
         $data['back'] = $this->url->link('marketplace/extension', 'user_token=' . $this->session->data['user_token'] . '&type=module');
@@ -34,6 +34,6 @@ class CatalogApi extends \Opencart\System\Engine\Controller {
         $data['column_left'] = $this->load->controller('common/column_left');
         $data['footer'] = $this->load->controller('common/footer');
 
-        $this->response->setOutput($this->load->view('extension/internet_shop/module/catalog_api', $data));
+        $this->response->setOutput($this->load->view('extension/ai_assistant/module/catalog_api', $data));
     }
 }

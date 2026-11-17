@@ -25,8 +25,8 @@ RUN php /tmp/language/apply.php /var/www/html /tmp/language/ru-translations.php 
 
 COPY apache/opencart.conf /etc/apache2/conf-enabled/opencart.conf
 COPY php/opencart.ini /usr/local/etc/php/conf.d/opencart.ini
-# The catalog API is an OpenCart extension (extension/internet_shop); provisioning registers it like Extensions > Modules > Install.
-COPY extension/internet_shop /var/www/html/extension/internet_shop
+# The catalog API is an OpenCart extension (extension/ai_assistant); provisioning registers it like Extensions > Modules > Install.
+COPY extension/ai_assistant /var/www/html/extension/ai_assistant
 COPY entrypoint.sh /usr/local/bin/shop-entrypoint
 COPY provision.sh /usr/local/bin/shop-provision
 RUN chmod +x /usr/local/bin/shop-entrypoint /usr/local/bin/shop-provision \

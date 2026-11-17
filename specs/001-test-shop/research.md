@@ -16,10 +16,10 @@ Items marked **Resolved** were settled by experiment during implementation (Open
 - **Alternatives considered**: Driving the admin UI with form posts (rejected: fragile, token handling,
   many form fields); A marketplace "Dynamic API" extension exposing models (unverified for
   OpenCart 4, third party); the Webkul REST add-ons (commercial, marketplace-oriented); direct SQL (forbidden by the constitution).
-- **Resolved**: The extension is a proper OpenCart extension, `shop/extension/internet_shop/` (with an
+- **Resolved**: The extension is a proper OpenCart extension, `shop/extension/ai_assistant/` (with an
   `install.json`), so nothing in OpenCart's core folders is modified and it can be installed and updated
-  from Extensions > Installer (`tools/package-extension.sh` builds `internet_shop.ocmod.zip`). The API is its
-  catalog-side controller (route `extension/internet_shop/api`, exposed as `/catalog-api/...` by an Apache
+  from Extensions > Installer (`tools/package-extension.sh` builds `ai_assistant.ocmod.zip`). The API is its
+  catalog-side controller (route `extension/ai_assistant/api`, exposed as `/catalog-api/...` by an Apache
   rewrite). It is registered as a module (`catalog_api`), which is what makes the catalog application
   autoload it; the demo's `provision.sh` does the same registration the admin's Install button would do. It registers the `Opencart\Admin`
   namespace with the autoloader and pre-registers the admin models (`design/seo_url`, `catalog/category`,
