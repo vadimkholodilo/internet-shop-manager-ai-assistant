@@ -10,4 +10,5 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:10.0
 WORKDIR /app
 COPY --from=build /out/shop-loader /app/shop-loader
 COPY data /data
+USER $APP_UID
 ENTRYPOINT ["/app/shop-loader"]

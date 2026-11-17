@@ -1,0 +1,5 @@
+# Dockerfile lint rules (hadolint). Run by the Claude Code Stop hook in .claude/hooks/check-code.sh.
+ignored:
+  # Pinning apt package versions breaks the build whenever Debian replaces a package; the base images are
+  # already pinned by tag.
+  - DL3008

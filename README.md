@@ -76,6 +76,11 @@ and MariaDB containers with Testcontainers (Docker required, the first run build
 CI checks formatting with `dotnet format --verify-no-changes`. A pre-commit hook formats the staged C# files for
 you; enable it once per clone with `git config core.hooksPath .githooks`.
 
+Claude Code also checks its own changes before finishing a turn (`.claude/hooks/check-code.sh`): `dotnet build` for C#,
+`php -l` for PHP, and for Docker files `hadolint`, `docker build --check`, `docker compose config` and
+`trivy config` (HIGH and CRITICAL). Install the linters with `brew install hadolint trivy`; a missing one is skipped.
+Findings accepted on purpose are listed with reasons in `.hadolint.yaml` and `.trivyignore.yaml`.
+
 How it is built is described in [`specs/001-test-shop/`](specs/001-test-shop/plan.md).
 
 ## Principles

@@ -1,5 +1,8 @@
 FROM php:8.2-apache
 
+# Fail a RUN that pipes (such as the find | while loops below) when any stage of the pipe fails.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG OPENCART_VERSION=4.1.0.4
 
 RUN apt-get update \
