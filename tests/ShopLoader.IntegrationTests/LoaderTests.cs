@@ -145,6 +145,7 @@ public sealed class LoaderTests(ShopStack shop) : ShopTest(shop)
 
         Assert.Equal(2, run.ExitCode);
         Assert.Contains("401", run.Error);
+        Assert.Contains("--api-key", run.Error);
         Assert.Equal(HttpStatusCode.NotFound, (await Api.TryGetProductAsync(catalog.Sku(1))).Status);
     }
 }

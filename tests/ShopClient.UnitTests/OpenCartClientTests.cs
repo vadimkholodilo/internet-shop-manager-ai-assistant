@@ -270,6 +270,30 @@ public sealed class OpenCartClientTests
     }
 
     [Fact(Timeout = 15_000)]
+    public async Task AnItemBusyWithAnotherWriteIsRetriedAndThenOnlyThatRecordFails()
+    {
+        using var shop = new ScriptedShop(Status(423));
+        using var client = new OpenCartClient(Quick(shop, maxRetries: 2));
+
+        var error = await Assert.ThrowsAsync<CatalogException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Equal(HttpStatusCode.Locked, error.StatusCode);
+        Assert.Equal(3, shop.Requests);
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task ARetryAfterBeyondTheLimitEndsTheRetrying()
+    {
+        using var shop = new ScriptedShop(Status(503, "Retry-After: 3600\r\n"));
+        using var client = new OpenCartClient(Quick(shop));
+
+        var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, error.StatusCode);
+        Assert.Equal(1, shop.Requests);
+    }
+
+    [Fact(Timeout = 15_000)]
     public async Task CancellingDuringAWaitBetweenAttemptsStopsRetrying()
     {
         using var shop = new ScriptedShop(Status(503));

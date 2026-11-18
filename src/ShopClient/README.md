@@ -46,9 +46,9 @@ takes to answer each attempt.
 
 ## Retries
 
-Requests that fail in a way that may be temporary (lost connection, timeout of one attempt, HTTP 408, 429, 500, 502, 503, 504)
+Requests that fail in a way that may be temporary (lost connection, timeout of one attempt, HTTP 408, 423, 429, 500, 502, 503, 504)
 are repeated up to `ShopConnection.MaxRetries` times (default 3; 0 turns retries off). The wait starts at
-`ShopConnection.RetryDelay` (default 0.5 s), doubles each time with jitter, is capped at 10 s and honors `Retry-After`.
+`ShopConnection.RetryDelay` (default 0.5 s), doubles each time with jitter, is capped at 10 s, and honors `Retry-After` exactly up to 60 s (a longer request ends the retrying).
 A rejected record (400, 404, 409, 415), a rejected API key (401), an unknown host, a TLS failure and cancellation are never retried. When the attempts are
 used up you get the same exception as without retries, with the number of attempts in its message.
 

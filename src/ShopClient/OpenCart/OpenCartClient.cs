@@ -60,7 +60,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
                 if (response.StatusCode == HttpStatusCode.Unauthorized)
                 {
                     throw new ShopUnavailableException(
-                        "The shop rejected the API key (401). Check SHOP_API_KEY / --api-key.", response.StatusCode);
+                        "The shop rejected the API key (401).", response.StatusCode);
                 }
                 lastProblem = $"HTTP {(int)response.StatusCode}";
             }

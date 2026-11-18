@@ -10,6 +10,9 @@ internal static class HttpRetry
 {
     private static readonly TimeSpan MaxDelay = TimeSpan.FromSeconds(10);
 
+    /// <summary>The longest wait a shop may ask for with Retry-After; asking for more ends the retrying.</summary>
+    private static readonly TimeSpan MaxRetryAfter = TimeSpan.FromSeconds(60);
+
     /// <summary>
     /// Returns the last response, which may still carry a temporary status once the retries are used up, with the number of
     /// attempts made. Throws <see cref="ShopUnavailableException"/> when the last attempt got no answer at all.
@@ -54,7 +57,14 @@ internal static class HttpRetry
                 throw new ShopUnavailableException(failure + Attempts(attempt), failureStatus, failureCause);
             }
 
-            var wait = Wait(connection.RetryDelay, attempt, response);
+            var requested = RetryAfter(response);
+            if (response is not null && requested > MaxRetryAfter)
+            {
+                // The shop asks for a pause longer than a load should sit through: stop here with what it said.
+                return (response, attempt);
+            }
+
+            var wait = Wait(connection.RetryDelay, attempt, requested);
             response?.Dispose();
             await Task.Delay(wait, cancellationToken);
         }
@@ -69,19 +79,26 @@ internal static class HttpRetry
             or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 
     /// <summary>
-    /// Statuses worth repeating: those of <see cref="IsShopUnavailable"/>, and 500, which is also how a passing error in
-    /// the shop looks even though it may be permanent for one record.
+    /// Statuses worth repeating: those of <see cref="IsShopUnavailable"/>; 500, which is also how a passing error in the
+    /// shop looks even though it may be permanent for one record; and 423, which the OpenCart catalog API answers while
+    /// another request is writing the same item. Those two stay a failure of the record once the retries are used up.
     /// </summary>
-    public static bool IsTemporary(HttpStatusCode status) => IsShopUnavailable(status) || status == HttpStatusCode.InternalServerError;
+    public static bool IsTemporary(HttpStatusCode status) =>
+        IsShopUnavailable(status) || status is HttpStatusCode.InternalServerError or HttpStatusCode.Locked;
 
-    private static TimeSpan Wait(TimeSpan baseDelay, int attempt, HttpResponseMessage? response)
+    private static TimeSpan? RetryAfter(HttpResponseMessage? response)
+    {
+        var header = response?.Headers.RetryAfter;
+        return header?.Delta ?? (header?.Date - DateTimeOffset.UtcNow);
+    }
+
+    private static TimeSpan Wait(TimeSpan baseDelay, int attempt, TimeSpan? requested)
     {
         // Doubles each time; half of it is random so that many clients do not come back together.
         var growth = Math.Min(baseDelay.TotalMilliseconds * Math.Pow(2, attempt - 1), MaxDelay.TotalMilliseconds);
         var wait = TimeSpan.FromMilliseconds(growth / 2 + Random.Shared.NextDouble() * growth / 2);
 
-        var retryAfter = response?.Headers.RetryAfter;
-        var requested = retryAfter?.Delta ?? (retryAfter?.Date - DateTimeOffset.UtcNow);
-        return requested is { } asked && asked > wait ? (asked < MaxDelay ? asked : MaxDelay) : wait;
+        // What the shop asked for is honored exactly, never shortened.
+        return requested is { } asked && asked > wait ? asked : wait;
     }
 }

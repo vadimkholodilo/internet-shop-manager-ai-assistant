@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Net;
 using ShopClient;
 using ShopLoader.Validation;
 
@@ -139,7 +140,7 @@ internal static class Cli
         }
         catch (ShopUnavailableException e)
         {
-            error.WriteLine(e.Message);
+            error.WriteLine(e.StatusCode == HttpStatusCode.Unauthorized ? e.Message + " Check SHOP_API_KEY / --api-key." : e.Message);
             return 2;
         }
     }

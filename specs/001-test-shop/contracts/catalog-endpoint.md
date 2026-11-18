@@ -41,7 +41,7 @@ Product: `{ "id": 345, "sku": "SM-0001", "name": "...", "category_id": 12, "cate
 ## Rules
 
 - Upserts are keyed by `slug` and `sku`; repeating a call with the same data changes nothing.
-- Writes to the same item are done one at a time (the extension takes a named lock per URL keyword), so repeating or overlapping a write never creates a second item. If the lock is not obtained within 10 seconds the answer is `503`, and the caller may repeat the request. Added by spec 002 (retries).
+- Writes to the same item are done one at a time (the extension takes a named lock per URL keyword), so repeating or overlapping a write never creates a second item. If the lock is not obtained within 10 seconds the answer is `423`, and the caller may repeat the request. Added by spec 002 (retries).
 - Ids are assigned by the shop, never accepted in requests, and stay the same across upserts of the same item.
 - Text is UTF-8; Cyrillic and markup characters such as `<` must round-trip unchanged. The shop stores text HTML-encoded and the API decodes it, so catalog text can never become markup on the storefront.
 - A SKU becomes the product's URL keyword and photo file name (lower case, anything but letters and digits replaced by `-`); two SKUs that map to the same keyword conflict (`409`). SKUs are compared ignoring case.

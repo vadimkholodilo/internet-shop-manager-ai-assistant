@@ -102,7 +102,7 @@ class Api extends \Opencart\System\Engine\Controller {
         $row = $this->db->query("SELECT GET_LOCK('" . $this->db->escape($name) . "', 10) AS `locked`")->row;
         if ((int)($row['locked'] ?? 0) !== 1) {
             // Another request keeps writing this item; the client repeats the request after a pause.
-            throw new ApiError(503, 'The item is being written by another request, try again');
+            throw new ApiError(423, 'The item is being written by another request, try again');
         }
     }
 

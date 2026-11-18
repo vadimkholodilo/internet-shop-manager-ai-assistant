@@ -55,7 +55,7 @@ public sealed record ShopConnection
     }
 
     /// <summary>
-    /// How many times a request that failed in a temporary way (lost connection, timeout, 408, 429, 500, 502, 503, 504) is
+    /// How many times a request that failed in a temporary way (lost connection, timeout, 408, 423, 429, 500, 502, 503, 504) is
     /// repeated after the first attempt; unknown hosts and TLS failures are not repeated. 0 turns retries off.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
