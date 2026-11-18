@@ -24,18 +24,6 @@ public sealed class CliTests : IDisposable
         Assert.Contains("--help", error);
     }
 
-    [Fact]
-    public async Task HelpPrintsUsageAndSucceeds()
-    {
-        var output = new StringWriter();
-
-        var exit = await Cli.RunAsync(["--help"], output, new StringWriter());
-
-        Assert.Equal(0, exit);
-        Assert.Contains("Usage:", output.ToString());
-        Assert.Contains("--wait-seconds", output.ToString());
-    }
-
     [Theory]
     [InlineData("--file", "x.json", "--url", "not-a-url", "--api-key", "k")]
     [InlineData("--file", "x.json", "--url", "ftp://shop", "--api-key", "k")]

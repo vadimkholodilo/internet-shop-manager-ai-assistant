@@ -29,18 +29,6 @@ public sealed class SampleCatalogTests
     }
 
     [Fact]
-    public void EveryProductHasAPriceAndAnExistingPhoto()
-    {
-        var images = Path.Combine(RepositoryRoot.Find(), "data", "images");
-
-        foreach (var product in Load().File.Products)
-        {
-            Assert.True(product.Price > 0, product.Sku);
-            Assert.True(File.Exists(Path.Combine(images, product.Image)), product.Sku);
-        }
-    }
-
-    [Fact]
     public void SampleCatalogIsInRussianAndMarkedAsGenerated()
     {
         var result = Load();

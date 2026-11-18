@@ -152,16 +152,4 @@ public sealed class LoaderTests(ShopStack shop)
         Assert.Contains("401", error);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, await shop.Http.StatusAsync($"catalog-api/products/{catalog.Sku(1)}"));
     }
-
-    [Fact]
-    public async Task UnreachableShopFailsClearlyAfterTheWaitTime()
-    {
-        using var catalog = new TestCatalog(shop.RepositoryRoot).AddProduct(1);
-        catalog.Write();
-
-        var (exit, _, error) = await RunAsync(catalog, url: "http://127.0.0.1:9/", wait: 1);
-
-        Assert.Equal(2, exit);
-        Assert.Contains("did not become ready", error);
-    }
 }

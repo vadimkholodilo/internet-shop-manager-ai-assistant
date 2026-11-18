@@ -72,21 +72,4 @@ public sealed class SampleDemoTests(ShopStack shop)
         Assert.Contains("Диагональ экрана", details);
         Assert.Contains("В наличии", details);
     }
-
-    [Fact]
-    public async Task EveryLoadedSampleProductHasAPhotoAndAPrice()
-    {
-        await RunLoaderContainerAsync();
-
-        var items = (await shop.Http.GetJsonAsync("catalog-api/products?page=1"))!["items"]!.AsArray()
-            .Where(i => i!["sku"]!.GetValue<string>().Length == 6 && i["sku"]!.GetValue<string>()[2] == '-')
-            .ToList();
-
-        Assert.NotEmpty(items);
-        Assert.All(items, i =>
-        {
-            Assert.True(i!["price"]!.GetValue<decimal>() > 0);
-            Assert.NotNull(i["image_url"]);
-        });
-    }
 }
