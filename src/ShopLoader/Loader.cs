@@ -1,10 +1,11 @@
+using ShopClient;
 using ShopLoader.Models;
 using ShopLoader.Validation;
 
 namespace ShopLoader;
 
 /// <summary>Loads a validated product file into a shop. Re-running it applies changes and creates no duplicates.</summary>
-internal sealed class Loader(ICatalogClient shop, TextWriter output)
+internal sealed class Loader(ICatalogLoadingClient shop, TextWriter output)
 {
     public async Task<LoadReport> LoadAsync(
         ValidationResult validation, string imagesDirectory, CancellationToken cancellationToken)
@@ -28,7 +29,7 @@ internal sealed class Loader(ICatalogClient shop, TextWriter output)
 
             try
             {
-                var result = await shop.UpsertCategoryAsync(category, cancellationToken);
+                var result = await shop.UpsertCategoryAsync(new CatalogCategory(category.Slug, category.Name, category.Parent), cancellationToken);
                 report.Category(result.Created);
                 output.WriteLine($"{(result.Created ? "created" : "updated")} category {category.Slug} (id {result.Id})");
             }
@@ -49,7 +50,7 @@ internal sealed class Loader(ICatalogClient shop, TextWriter output)
 
             try
             {
-                var result = await shop.UpsertProductAsync(product, cancellationToken);
+                var result = await shop.UpsertProductAsync(ToCatalog(product), cancellationToken);
                 await shop.UploadImageAsync(product.Sku, Path.Combine(imagesDirectory, product.Image), cancellationToken);
                 report.Product(result.Created);
                 output.WriteLine($"{(result.Created ? "created" : "updated")} product {product.Sku} (id {result.Id})");
@@ -62,6 +63,10 @@ internal sealed class Loader(ICatalogClient shop, TextWriter output)
 
         return report;
     }
+
+    private static CatalogProduct ToCatalog(ProductRecord product) =>
+        new(product.Sku, product.Name, product.Category, product.Brand, product.Description,
+            product.Attributes, product.Price, product.Quantity);
 
     private void Fail(LoadReport report, string kind, string key, string message)
     {

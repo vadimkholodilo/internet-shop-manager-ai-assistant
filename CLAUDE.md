@@ -18,8 +18,8 @@ in chat, with shop managers supervising and taking over. See `README.md` for the
 
 ## Workflow
 
-Spec Kit, one feature per directory in `specs/`, one feature at a time. Currently only `001-test-shop`;
-the AI assistant feature is added after it.
+Spec Kit, one feature per directory in `specs/`, one feature at a time. Features so far: `001-test-shop` and `002-shared-shop-client` (the shop client library in `src/ShopClient`, used by the loader and by the future connector);
+the AI assistant feature is added after them.
 
 Every feature is merged through a pull request with a short description; the `tests` GitHub Actions check
 must pass first (`.github/workflows/pull-request.yml`).

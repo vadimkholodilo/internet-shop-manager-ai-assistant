@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using ShopClient;
 
 namespace ShopLoader.IntegrationTests;
 
@@ -30,6 +31,13 @@ public abstract class ShopTest(ShopStack stack)
     /// <summary>A product with a new SKU in a new category, unless a category is given.</summary>
     protected async Task<ShopProduct> NewProductAsync(string? categorySlug = null) =>
         await Api.UpsertProductAsync(NewSku(), new ProductSpec(categorySlug ?? (await NewCategoryAsync()).Slug));
+
+    /// <summary>A catalog-loading client for the test shop, created the way any consumer does: through the factory.</summary>
+    protected ICatalogLoadingClient NewClient() =>
+        ShopClientFactory.CreateCatalogLoadingClient(ShopType.OpenCart, new ShopConnection(stack.ShopUrl, ShopStack.ApiKey));
+
+    /// <summary>A sample photo from the repository, for tests that upload one.</summary>
+    protected static string SampleImage => Path.Combine(Repository.Root, "data", "images", "tv-001.png");
 
     protected static TestCatalog NewCatalog() => new(Repository.Root);
 

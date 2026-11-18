@@ -41,7 +41,17 @@ class Api extends \Opencart\System\Engine\Controller {
 
         $write = ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET';
 
+        $lock = null;
         try {
+            // Writes to one item are done one at a time. Without this, a repeated write (a client retry sent while the
+            // first request is still running) could find no item and create it a second time.
+            if ($write) {
+                $name = $this->writeLockName();
+                if ($name !== null) {
+                    $this->acquireLock($name);
+                    $lock = $name;
+                }
+            }
             // A failed write must not leave half-created records behind.
             if ($write) {
                 $this->db->query("START TRANSACTION");
@@ -61,6 +71,43 @@ class Api extends \Opencart\System\Engine\Controller {
             }
             $this->log->write('catalog_api: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
             $this->respond(500, ['error' => 'Internal error']);
+        } finally {
+            if ($lock !== null) {
+                $this->db->query("SELECT RELEASE_LOCK('" . $this->db->escape($lock) . "')");
+            }
+        }
+    }
+
+    /** Name of the lock for the item a write is about, or null when the request is not a write to an item. */
+    private function writeLockName(): ?string {
+        $parts = $this->pathParts();
+        $resource = $parts[0] ?? '';
+        $key = $parts[1] ?? null;
+        if ($key === null) {
+            return null;
+        }
+
+        // The same normalization that makes the URL keyword, so SKUs that would collide on it share one lock.
+        if ($resource === 'products') {
+            return 'catalog_api:' . md5('product:' . $this->productKeyword($key));
+        }
+        if ($resource === 'categories') {
+            return 'catalog_api:' . md5('category:' . $this->keyword($key, 'category'));
+        }
+        return null;
+    }
+
+    /** The decoded segments of the requested path: resource, key, optional sub-resource. */
+    private function pathParts(): array {
+        $parts = array_values(array_filter(explode('/', trim((string)($this->request->get['api_path'] ?? ''), '/')), 'strlen'));
+        return array_map('rawurldecode', $parts);
+    }
+
+    private function acquireLock(string $name): void {
+        $row = $this->db->query("SELECT GET_LOCK('" . $this->db->escape($name) . "', 10) AS `locked`")->row;
+        if ((int)($row['locked'] ?? 0) !== 1) {
+            // Another request keeps writing this item; the client repeats the request after a pause.
+            throw new ApiError(423, 'The item is being written by another request, try again');
         }
     }
 
@@ -68,8 +115,7 @@ class Api extends \Opencart\System\Engine\Controller {
 
     private function dispatch(): void {
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $parts = array_values(array_filter(explode('/', trim((string)($this->request->get['api_path'] ?? ''), '/')), 'strlen'));
-        $parts = array_map('rawurldecode', $parts);
+        $parts = $this->pathParts();
 
         $resource = $parts[0] ?? '';
         $key = $parts[1] ?? null;
