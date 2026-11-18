@@ -12,7 +12,7 @@ public sealed record ShopConnection
     /// <param name="url">Absolute http or https address of the shop.</param>
     /// <param name="apiKey">Credential for the shop's API; never logged.</param>
     /// <exception cref="ArgumentNullException"><paramref name="url"/> or <paramref name="apiKey"/> is null.</exception>
-    /// <exception cref="ArgumentException"><paramref name="url"/> is not an absolute http(s) address, or <paramref name="apiKey"/> is blank.</exception>
+    /// <exception cref="ArgumentException"><paramref name="url"/> is not an absolute http(s) address or has a query, fragment or credentials, or <paramref name="apiKey"/> is blank or has characters other than visible ASCII.</exception>
     public ShopConnection(Uri url, string apiKey)
     {
         ArgumentNullException.ThrowIfNull(url);
@@ -20,6 +20,18 @@ public sealed record ShopConnection
         if (!url.IsAbsoluteUri || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
         {
             throw new ArgumentException($"The shop URL must be an absolute http or https address, got \"{url}\".", nameof(url));
+        }
+
+        if (url.Query.Length > 0 || url.Fragment.Length > 0 || url.UserInfo.Length > 0)
+        {
+            // A query or fragment would be lost when request paths are added to the address, and credentials in the
+            // address would end up in messages and logs.
+            throw new ArgumentException("The shop URL must not contain a query, a fragment or credentials.", nameof(url));
+        }
+        if (apiKey.Any(c => c is <= ' ' or > '~'))
+        {
+            // Typically a newline or space copied along with the key; it would break the Authorization header.
+            throw new ArgumentException("The API key must consist of visible ASCII characters only (no spaces, line breaks or non-ASCII).", nameof(apiKey));
         }
 
         Url = url;

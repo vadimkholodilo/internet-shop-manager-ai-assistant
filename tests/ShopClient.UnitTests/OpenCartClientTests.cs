@@ -4,7 +4,13 @@ using ShopClient.OpenCart;
 
 namespace ShopClient.UnitTests;
 
-/// <summary>How the client reports a shop that cannot be reached, using real sockets (no shop and no stand-in for HTTP).</summary>
+/// <summary>
+/// How the client reports a shop that cannot be reached or answers in a temporary way, using real sockets. Most
+/// scenarios need no shop at all (a closed or silent port). The <c>ScriptedShop</c> ones (503 then success, Retry-After,
+/// an HTML answer) cannot be reproduced on demand with the real shop, so by decision of the product owner they are unit
+/// tests of the client's own retry and error-mapping logic, an exception to the rule against stand-ins for the shop.
+/// What the real shop does with a repeated write is covered against the real shop in <c>ShopClientTests</c>.
+/// </summary>
 public sealed class OpenCartClientTests
 {
     private static readonly CatalogCategory Category = new("c", "Категория", null);

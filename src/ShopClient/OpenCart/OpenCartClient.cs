@@ -167,8 +167,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
         {
             throw new ShopUnavailableException("The shop rejected the API key (401).", response.StatusCode);
         }
-        if (response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
-            or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
+        if (HttpRetry.IsShopUnavailable(response.StatusCode))
         {
             // The shop, or the proxy in front of it, says it cannot serve anyone right now; this is not about the record.
             throw new ShopUnavailableException(

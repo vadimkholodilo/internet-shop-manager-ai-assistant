@@ -49,6 +49,10 @@ public sealed class ShopClientFactoryTests
         Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("/relative", UriKind.Relative), "key"));
         Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("ftp://shop.example"), "key"));
         Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("http://shop.example"), " "));
+        Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("http://shop.example?x=1"), "key"));
+        Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("http://user:pass@shop.example"), "key"));
+        Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("http://shop.example"), "key\n"));
+        Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("http://shop.example"), "ключ"));
         Assert.Throws<ArgumentOutOfRangeException>(() => new ShopConnection(new Uri("http://shop.example"), "key") { RequestTimeout = TimeSpan.Zero });
         Assert.Throws<ArgumentOutOfRangeException>(() => new ShopConnection(new Uri("http://shop.example"), "key") { MaxRetries = -1 });
         Assert.Throws<ArgumentOutOfRangeException>(() => new ShopConnection(new Uri("http://shop.example"), "key") { RetryDelay = TimeSpan.FromSeconds(-1) });

@@ -58,9 +58,16 @@ internal static class HttpRetry
     /// <summary>Appended to messages of failures that came after repeated attempts.</summary>
     public static string Attempts(int attempts) => attempts > 1 ? $" (after {attempts} attempts)" : "";
 
-    public static bool IsTemporary(HttpStatusCode status) =>
-        status is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests or HttpStatusCode.InternalServerError
+    /// <summary>Statuses that say the shop cannot serve anyone right now, as opposed to a problem with one record.</summary>
+    public static bool IsShopUnavailable(HttpStatusCode status) =>
+        status is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
             or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
+
+    /// <summary>
+    /// Statuses worth repeating: those of <see cref="IsShopUnavailable"/>, and 500, which is also how a passing error in
+    /// the shop looks even though it may be permanent for one record.
+    /// </summary>
+    public static bool IsTemporary(HttpStatusCode status) => IsShopUnavailable(status) || status == HttpStatusCode.InternalServerError;
 
     private static TimeSpan Wait(TimeSpan baseDelay, int attempt, HttpResponseMessage? response)
     {
