@@ -21,6 +21,8 @@ internal static partial class ProductFileValidator
     [GeneratedRegex("^[a-z0-9-]+$")]
     private static partial Regex SlugPattern();
 
+    private static readonly HashSet<string> RootFields = ["generated", "source", "categories", "products"];
+
     private static readonly HashSet<string> CategoryFields = ["slug", "name", "parent"];
 
     private static readonly HashSet<string> ProductFields =
@@ -57,6 +59,10 @@ internal static partial class ProductFileValidator
             !root.TryGetProperty("products", out var productsElement) || productsElement.ValueKind != JsonValueKind.Array)
         {
             throw new ProductFileException("Product file must be an object with \"categories\" and \"products\" arrays.");
+        }
+        foreach (var field in root.EnumerateObject().Where(field => !RootFields.Contains(field.Name)))
+        {
+            throw new ProductFileException($"Product file has an unknown field: {field.Name}");
         }
 
         var errors = new List<RecordError>();
@@ -186,7 +192,7 @@ internal static partial class ProductFileValidator
     {
         var known = categories.Select(c => c.Slug).ToHashSet(StringComparer.Ordinal);
         var parsed = new List<ProductRecord>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase); // the shop compares SKUs ignoring case
         var index = 0;
 
         foreach (var element in array.EnumerateArray())
@@ -287,8 +293,10 @@ internal static partial class ProductFileValidator
             }
         }
 
-        var imagePath = Path.GetFullPath(Path.Combine(imagesDirectory, image));
-        if (!imagePath.StartsWith(Path.GetFullPath(imagesDirectory), StringComparison.Ordinal) || !File.Exists(imagePath))
+        // Compare with a trailing separator, so a sibling such as "images-private" is not taken for "images".
+        var imagesRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(imagesDirectory)) + Path.DirectorySeparatorChar;
+        var imagePath = Path.GetFullPath(Path.Combine(imagesRoot, image));
+        if (!imagePath.StartsWith(imagesRoot, StringComparison.Ordinal) || !File.Exists(imagePath))
         {
             return $"image file not found: {image}";
         }

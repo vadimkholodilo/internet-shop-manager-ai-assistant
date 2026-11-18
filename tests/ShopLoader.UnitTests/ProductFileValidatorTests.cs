@@ -54,6 +54,7 @@ public sealed class ProductFileValidatorTests : IDisposable
     [InlineData("[]")]
     [InlineData("""{"categories":[]}""")]
     [InlineData("""{"categories":{},"products":[]}""")]
+    [InlineData("""{"categories":[],"products":[],"colour":"red"}""")]
     public void WrongFormatFailsBeforeAnyChange(string json)
     {
         var file = directory.WriteCatalog(json);
@@ -110,6 +111,19 @@ public sealed class ProductFileValidatorTests : IDisposable
     }
 
     [Fact]
+    public void ImagePathCannotEscapeToASiblingDirectoryWithTheSamePrefix()
+    {
+        var sibling = directory.Images + "-private";
+        Directory.CreateDirectory(sibling);
+        File.WriteAllBytes(Path.Combine(sibling, "x.png"), [1]);
+
+        var result = Validate(Product(image: $"../{Path.GetFileName(sibling)}/x.png"));
+
+        Assert.Empty(result.File.Products);
+        Assert.Single(result.Errors);
+    }
+
+    [Fact]
     public void UnknownCategoryIsReported()
     {
         var result = Validate(Product(category: "tablets"));
@@ -144,6 +158,16 @@ public sealed class ProductFileValidatorTests : IDisposable
 
         var product = Assert.Single(result.File.Products);
         Assert.Equal(100m, product.Price);
+        Assert.Contains("duplicate sku", Assert.Single(result.Errors).Message);
+    }
+
+    [Fact]
+    public void SkusThatDifferOnlyByCaseAreDuplicates()
+    {
+        // The shop compares SKUs ignoring case, so these would be the same product there.
+        var result = Validate(Product(sku: "sm-1", price: "100") + "," + Product(sku: "SM-1", price: "200"));
+
+        Assert.Equal("sm-1", Assert.Single(result.File.Products).Sku);
         Assert.Contains("duplicate sku", Assert.Single(result.Errors).Message);
     }
 
