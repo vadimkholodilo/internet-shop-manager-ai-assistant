@@ -82,7 +82,9 @@ and MariaDB containers with Testcontainers (Docker required, the first run build
   clone with `git config core.hooksPath .githooks`, and install the linters with `brew install hadolint trivy`
   (a missing linter is reported and skipped). `git commit --no-verify` skips it.
 - Claude Code runs the same script on its changes before finishing a turn (`.claude/hooks/check-code.sh`).
-- CI is the final gate: `dotnet format --verify-no-changes`, `tools/lint-php.sh`, and the tests.
+- CI is the final gate: `dotnet format --verify-no-changes`, `tools/lint-php.sh`, the Docker linters (only when a
+  Dockerfile, a compose file or the linter configuration changed; they are installed at a pinned version and checked
+  against a checksum), and the tests.
 
 How it is built is described in [`specs/001-test-shop/`](specs/001-test-shop/plan.md).
 
