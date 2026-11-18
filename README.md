@@ -24,6 +24,7 @@ Development is spec-driven ([Spec Kit](https://github.com/github/spec-kit)). Eac
 | # | Feature | Status | Depends on |
 |---|---------|--------|------------|
 | 001 | [Test electronics shop](specs/001-test-shop/spec.md): OpenCart in Docker, JSON product loader, generated sample catalog | Implemented | none |
+| 002 | [Shared shop client library](specs/002-shared-shop-client/spec.md): the shop client moves out of the loader into `src/ShopClient`, behind shop-neutral contracts | Implemented | 001 |
 
 Next, once 001 is done: the shop connector, public address, order API and a larger catalog, then the shop AI assistant (product search, ordering, order tracking, handoff, ratings).
 Features are specified one at a time.
@@ -61,6 +62,9 @@ anywhere and run the loader against the running shop:
 ```bash
 dotnet run --project src/ShopLoader -- --file my-catalog.json --url http://localhost:8080 --api-key local-demo-api-key-change-me
 ```
+
+The optional `--shop` flag names the kind of shop (default and only supported value: `opencart`). The loader talks to
+the shop through the [`src/ShopClient`](src/ShopClient/README.md) library, which the future shop connector will share.
 
 **Development.** The development override also publishes the database port, so tools can run on your machine:
 

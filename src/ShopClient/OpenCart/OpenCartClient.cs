@@ -3,33 +3,29 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using ShopLoader.Json;
-using ShopLoader.Models;
-
-namespace ShopLoader.OpenCart;
+namespace ShopClient.OpenCart;
 
 /// <summary>
 /// The only class that knows about OpenCart. It talks to the catalog API extension
 /// (specs/001-test-shop/contracts/catalog-endpoint.md) and never to the shop's database.
 /// </summary>
-internal sealed class OpenCartCatalogClient : ICatalogClient, IDisposable
+internal sealed class OpenCartClient : ICatalogLoadingClient
 {
     private readonly HttpClient http;
     private readonly TimeSpan requestTimeout;
 
-    /// <param name="requestTimeout">How long one request may take (default 60 seconds).</param>
-    public OpenCartCatalogClient(Uri shopUrl, string apiKey, TimeSpan? requestTimeout = null)
+    public OpenCartClient(ShopConnection connection)
     {
-        this.requestTimeout = requestTimeout ?? TimeSpan.FromSeconds(60);
+        requestTimeout = connection.RequestTimeout ?? TimeSpan.FromSeconds(60);
         http = new HttpClient
         {
-            BaseAddress = new Uri(shopUrl.ToString().TrimEnd('/') + "/"),
+            BaseAddress = new Uri(connection.Url.ToString().TrimEnd('/') + "/"),
             Timeout = this.requestTimeout,
         };
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", connection.ApiKey);
     }
 
-    public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         var deadline = DateTime.UtcNow + timeout;
         string lastProblem = "not tried yet";
@@ -68,17 +64,17 @@ internal sealed class OpenCartCatalogClient : ICatalogClient, IDisposable
         }
     }
 
-    public Task<UpsertResult> UpsertCategoryAsync(CategoryRecord category, CancellationToken cancellationToken) =>
+    public Task<UpsertResult> UpsertCategoryAsync(CatalogCategory category, CancellationToken cancellationToken = default) =>
         PutJsonAsync($"catalog-api/categories/{Uri.EscapeDataString(category.Slug)}",
-            new CategoryRequest(category.Name, category.Parent), LoaderJsonContext.Default.CategoryRequest, cancellationToken);
+            new CategoryRequest(category.Name, category.Parent), OpenCartJsonContext.Default.CategoryRequest, cancellationToken);
 
-    public Task<UpsertResult> UpsertProductAsync(ProductRecord product, CancellationToken cancellationToken) =>
+    public Task<UpsertResult> UpsertProductAsync(CatalogProduct product, CancellationToken cancellationToken = default) =>
         PutJsonAsync($"catalog-api/products/{Uri.EscapeDataString(product.Sku)}",
             new ProductRequest(product.Name, product.Category, product.Brand, product.Description,
                 product.Attributes, product.Price, product.Quantity),
-            LoaderJsonContext.Default.ProductRequest, cancellationToken);
+            OpenCartJsonContext.Default.ProductRequest, cancellationToken);
 
-    public async Task UploadImageAsync(string sku, string imagePath, CancellationToken cancellationToken)
+    public async Task UploadImageAsync(string sku, string imagePath, CancellationToken cancellationToken = default)
     {
         var contentType = Path.GetExtension(imagePath).ToLowerInvariant() switch
         {
@@ -102,7 +98,7 @@ internal sealed class OpenCartCatalogClient : ICatalogClient, IDisposable
         using var response = await SendAsync(HttpMethod.Put, path, content, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
 
-        var item = await response.Content.ReadFromJsonAsync(LoaderJsonContext.Default.ItemResponse, cancellationToken)
+        var item = await response.Content.ReadFromJsonAsync(OpenCartJsonContext.Default.ItemResponse, cancellationToken)
                    ?? throw new CatalogException("the shop returned an empty response");
         return new UpsertResult(item.Id, item.Created ?? false);
     }
@@ -140,7 +136,7 @@ internal sealed class OpenCartCatalogClient : ICatalogClient, IDisposable
         var message = $"HTTP {(int)response.StatusCode}";
         try
         {
-            var error = await response.Content.ReadFromJsonAsync(LoaderJsonContext.Default.ErrorResponse, cancellationToken);
+            var error = await response.Content.ReadFromJsonAsync(OpenCartJsonContext.Default.ErrorResponse, cancellationToken);
             if (!string.IsNullOrEmpty(error?.Error))
             {
                 message += $": {error.Error}";

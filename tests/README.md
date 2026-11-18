@@ -1,11 +1,12 @@
 # Tests
 
-Two projects, split by one question: **does the test need the shop?**
+Three projects, split by one question: **does the test need the shop?**
 
 | Project | Put a test here when | How it runs |
 |---------|----------------------|-------------|
-| `ShopLoader.UnitTests` | it checks logic that needs no shop: validating a product file, parsing the command line, formatting the report, how the client reports an unreachable shop | in milliseconds, no Docker |
-| `ShopLoader.IntegrationTests` | it involves the shop: what the catalog API returns, what the storefront shows, what the loader does to a shop | against a real OpenCart and MariaDB started with Testcontainers (Docker required) |
+| `ShopLoader.UnitTests` | it checks loader logic that needs no shop: validating a product file, parsing the command line, formatting the report | in milliseconds, no Docker |
+| `ShopClient.UnitTests` | it checks the shared client library without a shop: choosing a client by shop type, how the client reports an unreachable shop | in milliseconds, no Docker |
+| `ShopLoader.IntegrationTests` | it involves the shop: what the catalog API returns, what the storefront shows, what the loader or the shared client does to a shop (`ShopClientTests` uses the library alone, through its factory) | against a real OpenCart and MariaDB started with Testcontainers (Docker required) |
 
 Nothing is mocked. A scenario that cannot be reproduced against the real shop is not tested with a stand-in; it is
 either made reproducible (two SKUs that the shop rejects with `409`) or left untested on purpose.

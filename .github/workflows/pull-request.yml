@@ -99,6 +99,9 @@ jobs:
       - name: Unit tests
         run: dotnet test tests/ShopLoader.UnitTests --configuration Release --no-build
 
+      - name: Shop client unit tests
+        run: dotnet test tests/ShopClient.UnitTests --configuration Release --no-build
+
       # Starts real OpenCart and MariaDB containers with Testcontainers and runs the loader against them.
       - name: Integration tests
         run: dotnet test tests/ShopLoader.IntegrationTests --configuration Release --no-build

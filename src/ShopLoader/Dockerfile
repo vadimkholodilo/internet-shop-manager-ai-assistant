@@ -3,6 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 RUN apt-get update && apt-get install -y --no-install-recommends clang zlib1g-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 COPY global.json Directory.Build.props ./
+COPY src/ShopClient/ src/ShopClient/
 COPY src/ShopLoader/ src/ShopLoader/
 RUN dotnet publish src/ShopLoader/ShopLoader.csproj -c Release -o /out
 
