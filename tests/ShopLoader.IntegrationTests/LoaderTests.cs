@@ -95,6 +95,27 @@ public sealed class LoaderTests(ShopStack shop)
     }
 
     [Fact]
+    public async Task ProductTheShopRejectsIsReportedAndTheRestAreLoaded()
+    {
+        // The validator accepts both SKUs, but the shop gives them the same URL keyword and answers 409 for the second.
+        using var catalog = new TestCatalog(shop.RepositoryRoot).AddProduct(1);
+        var colliding = catalog.Product(2);
+        colliding["sku"] = catalog.Sku(1).Replace('-', '_');
+        catalog.AddRaw(colliding).AddProduct(3);
+        catalog.Write();
+
+        var (exit, output, _) = await RunAsync(catalog);
+
+        Assert.Equal(1, exit);
+        Assert.Contains($"FAILED product {colliding["sku"]}", output);
+        Assert.Contains("409", output);
+        Assert.Contains("Products: 2 created", output);
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, await shop.Http.StatusAsync($"catalog-api/products/{colliding["sku"]}"));
+        Assert.NotNull(await shop.Http.ProductAsync(catalog.Sku(1)));
+        Assert.NotNull(await shop.Http.ProductAsync(catalog.Sku(3)));
+    }
+
+    [Fact]
     public async Task CyrillicSpecialCharactersAndVeryLongValuesAreStoredCorrectly()
     {
         var longDescription = string.Concat(Enumerable.Repeat("Очень длинное описание товара. ", 200));
@@ -122,22 +143,6 @@ public sealed class LoaderTests(ShopStack shop)
         await RunAsync(catalog);
 
         Assert.Equal(0, (await shop.Http.ProductAsync(catalog.Sku(1)))!["quantity"]!.GetValue<int>());
-    }
-
-    [Fact]
-    public async Task InvalidFileFailsBeforeChangingAnything()
-    {
-        using var catalog = new TestCatalog(shop.RepositoryRoot);
-        File.WriteAllText(catalog.File, "{ this is not json");
-        var products = await shop.Http.ProductCountAsync();
-        var categories = await shop.Http.CategoryCountAsync();
-
-        var (exit, _, error) = await RunAsync(catalog);
-
-        Assert.Equal(2, exit);
-        Assert.Contains("not valid JSON", error);
-        Assert.Equal(products, await shop.Http.ProductCountAsync());
-        Assert.Equal(categories, await shop.Http.CategoryCountAsync());
     }
 
     [Fact]

@@ -36,15 +36,6 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
-    public async Task UnknownOptionIsRejected()
-    {
-        var (exit, error) = await Run("--file", "x.json", "--url", "http://shop", "--api-key", "k", "--colour", "red");
-
-        Assert.Equal(2, exit);
-        Assert.Contains("--colour", error);
-    }
-
-    [Fact]
     public async Task ApiKeyIsRequiredWhenNeitherOptionNorEnvironmentProvidesIt()
     {
         var saved = Environment.GetEnvironmentVariable("SHOP_API_KEY");

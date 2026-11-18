@@ -14,17 +14,17 @@ namespace ShopLoader.OpenCart;
 /// </summary>
 internal sealed class OpenCartCatalogClient : ICatalogClient, IDisposable
 {
-    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(60);
-
     private readonly HttpClient http;
+    private readonly TimeSpan requestTimeout;
 
-    /// <param name="handler">Replaces the network in tests.</param>
-    public OpenCartCatalogClient(Uri shopUrl, string apiKey, HttpMessageHandler? handler = null)
+    /// <param name="requestTimeout">How long one request may take (default 60 seconds).</param>
+    public OpenCartCatalogClient(Uri shopUrl, string apiKey, TimeSpan? requestTimeout = null)
     {
-        http = new HttpClient(handler ?? new HttpClientHandler())
+        this.requestTimeout = requestTimeout ?? TimeSpan.FromSeconds(60);
+        http = new HttpClient
         {
             BaseAddress = new Uri(shopUrl.ToString().TrimEnd('/') + "/"),
-            Timeout = RequestTimeout,
+            Timeout = this.requestTimeout,
         };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }
@@ -122,7 +122,7 @@ internal sealed class OpenCartCatalogClient : ICatalogClient, IDisposable
         {
             // HttpClient reports its own timeout this way. A shop that stops answering ends the run like a lost
             // connection does, instead of making every remaining record wait for the timeout.
-            throw new ShopUnavailableException($"The shop did not answer within {RequestTimeout.TotalSeconds:0} seconds.");
+            throw new ShopUnavailableException($"The shop did not answer within {requestTimeout.TotalSeconds:0.##} seconds.");
         }
     }
 

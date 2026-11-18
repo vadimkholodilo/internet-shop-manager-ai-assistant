@@ -56,8 +56,8 @@ Paths follow plan.md: `shop/` (image and extension), `src/ShopLoader/`, `tests/S
 ### Tests for User Story 2
 
 - [X] T010 [P] [US2] Unit tests for product file validation in `tests/ShopLoader.UnitTests/ProductFileValidatorTests.cs` covering: file missing, invalid JSON, wrong format, duplicate `sku` keeps the first, missing or non-positive `price`, missing `image` file, unknown `category` slug, Cyrillic and very long values
-- [X] T011 [P] [US2] Unit tests for request mapping and the load report in `tests/ShopLoader.UnitTests/LoaderTests.cs` (a failed record is reported with its `sku` and the others continue)
-- [X] T012 [P] [US2] Integration tests in `tests/ShopLoader.IntegrationTests/LoaderTests.cs` and `CatalogApiTests.cs` against real containers: first load creates everything, second load creates 0 duplicates, a changed price updates only that product, a malformed record is reported and the rest load, Cyrillic round-trips (uses a Testcontainers fixture from T013)
+- [X] T011 [P] [US2] Unit tests for the load report in `tests/ShopLoader.UnitTests/LoadReportTests.cs`, for the validator, the command line and how the client reports an unreachable shop; nothing is tested against a fake shop
+- [X] T012 [P] [US2] Integration tests in `tests/ShopLoader.IntegrationTests/LoaderTests.cs` and `CatalogApiTests.cs` against real containers: first load creates everything, second load creates 0 duplicates, a changed price updates only that product, a malformed record and a record the shop rejects are reported and the rest load, Cyrillic round-trips (uses a Testcontainers fixture from T013)
 - [X] T013 [US2] Testcontainers fixture in `tests/ShopLoader.IntegrationTests/ShopStack.cs` that builds the repository's own `shop/Dockerfile` and `src/ShopLoader/Dockerfile` and starts real MariaDB and OpenCart containers with the same environment as `docker-compose.yml` (the Compose module cannot build local contexts, see research R7), exposing the shop URL and API key and removing containers afterwards; tests use unique SKUs so they do not depend on order
 
 ### Implementation for User Story 2
