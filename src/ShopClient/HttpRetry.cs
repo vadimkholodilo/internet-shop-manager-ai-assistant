@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace ShopClient.Http;
+namespace ShopClient;
 
 /// <summary>
 /// Sends a request again when it failed in a temporary way. Only for requests that are safe to repeat; every request

@@ -55,7 +55,7 @@ used up you get the same exception as without retries, with the number of attemp
 This is safe because every request is idempotent by the item's key (SKU or slug), and the OpenCart catalog API serializes
 writes to one key so that overlapping repeats cannot create a second item. Two things to know: a repeated write whose first
 attempt had already succeeded reports the item as updated, not created, and a request against a shop that hangs can take up
-to `(MaxRetries + 1) × RequestTimeout` before it fails. The helper is `Http/HttpRetry.cs`; another HTTP-based client uses it
+to `(MaxRetries + 1) × RequestTimeout` before it fails. The helper is `HttpRetry.cs`; another HTTP-based client uses it
 the same way (build a fresh request per attempt inside the function you pass).
 
 ## Adding a shop
