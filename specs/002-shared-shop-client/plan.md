@@ -18,7 +18,7 @@ library's public surface.
 
 **Language/Version**: C# on .NET 10
 
-**Primary Dependencies**: none new. The library uses `System.Text.Json` with source generation and `HttpClient`; the loader keeps `System.CommandLine`.
+**Primary Dependencies**: none new (retries are our own helper, not Polly; see research R9). The library uses `System.Text.Json` with source generation and `HttpClient`; the loader keeps `System.CommandLine`.
 
 **Storage**: N/A
 

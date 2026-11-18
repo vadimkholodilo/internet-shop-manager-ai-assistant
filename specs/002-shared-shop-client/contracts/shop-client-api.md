@@ -39,7 +39,9 @@ public sealed record ShopConnection
     public ShopConnection(Uri url, string apiKey);
     public Uri Url { get; }
     public string ApiKey { get; }
-    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(60);   // overridable; must be positive
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(60);   // per attempt; overridable; must be positive
+    public int MaxRetries { get; init; } = 3;                                    // retries after the first attempt; 0 = none
+    public TimeSpan RetryDelay { get; init; } = TimeSpan.FromMilliseconds(500);  // before the first retry; doubles, jittered, capped at 10 s
 }
 public sealed record UpsertResult(long Id, bool Created);
 public sealed record CatalogCategory(string Slug, string Name, string? Parent);
@@ -62,6 +64,8 @@ does not need to write `CancellationToken.None`.
 - Upserts are idempotent: the same key updates, never duplicates; `Created` tells which happened.
 - A rejected single record, an unreadable image file or a non-JSON answer raises `CatalogException`; a lost connection, timeout, `401` or `502/503/504` raises `ShopUnavailableException`. Both carry the HTTP status when there was an answer and the original exception as `InnerException`.
 - A bad argument (null, blank key fields, negative price or quantity, non-positive timeout) raises the `ArgumentException` family before any request is made.
+- Temporary failures (lost connection, attempt timeout, 408/429/500/502/503/504) are retried up to `MaxRetries` times with exponential backoff and jitter; the final failure is the one that would have been thrown without retries, naming the attempts. Rejections of the record, `401` and cancellation are never retried.
+- The OpenCart catalog API serializes writes per item key, so a repeated write never creates a second item.
 - `WaitUntilReadyAsync(timeout)` tries at least once and does not run past `timeout` because of a slow attempt.
 - The library never opens a database connection and holds no static shop state, so several clients for different shops can coexist.
 

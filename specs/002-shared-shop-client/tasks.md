@@ -112,6 +112,24 @@ description: "Task list for the Shared Shop Client Library"
 
 ---
 
+## Phase 7: Resilience (added 2026-11-19; FR-015 to FR-019, SC-007, SC-008)
+
+**Goal**: Temporary shop errors do not fail records or runs, and retries can never create duplicates.
+
+**Independent Test**: A shop that fails twice and then answers produces no failed record; two simultaneous writes of one new SKU produce one product.
+
+- [X] T028 [P] Extend `ShopConnection` (`src/ShopClient/ShopConnection.cs`) with `MaxRetries` (default 3) and `RetryDelay` (default 0.5 s), both validated not negative; update the library README
+- [X] T029 Write the internal retry helper `src/ShopClient/Http/HttpRetry.cs` per research R9 (statuses, backoff with jitter capped at 10 s, `Retry-After` within the cap, a fresh request per attempt, caller cancellation never retried, attempts named in the final failure with the last error inside)
+- [X] T030 Use it in `src/ShopClient/OpenCart/OpenCartClient.cs` for the upserts and the image upload (build the request, including content, inside the function passed to the helper); `WaitUntilReadyAsync` keeps its own loop
+- [X] T031 [P] Unit tests in `tests/ShopClient.UnitTests` (real sockets, a scripted listener that answers a list of responses in order): 503 twice then success makes no failure; 400/404/409/401 are not retried; exhausted retries throw the original failure type with the attempt count; `MaxRetries = 0` makes one attempt; `Retry-After` is honored; cancellation is not retried
+- [X] T032 In `shop/extension/ai_assistant/catalog/controller/api.php` take a named lock per key (`GET_LOCK`, 10 s, `503` when not obtained) before the lookup in every write and release it after commit or rollback, per research R10; update the extension's contract text in `specs/001-test-shop/contracts/catalog-endpoint.md` (Rules: writes to the same key are serialized)
+- [X] T033 Integration test in `tests/ShopLoader.IntegrationTests/ShopClientTests.cs`: two simultaneous upserts of one new SKU through the library leave exactly one product with that SKU (SC-007)
+- [X] T034 Update `README.md`/`CLAUDE.md` only if they describe client failure handling; run `dotnet format`, the unit suites, the integration suite and `tools/smoke-test.sh`; tick `quickstart.md` scenario for retries
+
+**Checkpoint**: SC-007 and SC-008 hold.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -122,6 +140,7 @@ description: "Task list for the Shared Shop Client Library"
 - **US2 (Phase 4)**: depends on Phase 2 and on US1 for the integration test that runs through the stack (T019 only needs Phase 2)
 - **US3 (Phase 5)**: depends on Phase 2; T024 should run after US1
 - **Polish (Phase 6)**: depends on all stories
+- **Resilience (Phase 7)**: depends on Phases 3 and 4; T029 before T030; T031 with T029; T032 before T033
 
 ### Within Each Story
 

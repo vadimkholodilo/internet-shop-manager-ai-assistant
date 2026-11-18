@@ -46,14 +46,20 @@ the list of supported names. `default(ShopType)` has no name and is invalid: the
 |-------|------|-------|
 | Url | Uri | Address of the shop |
 | ApiKey | string | Credential for the shop's API; never logged |
-| RequestTimeout | TimeSpan | One request's limit; defaults to 60 seconds on the connection itself and can be overridden |
+| RequestTimeout | TimeSpan | One attempt's limit; defaults to 60 seconds on the connection itself and can be overridden; must be positive |
+| MaxRetries | int | Retries after the first attempt for temporary failures; default 3, 0 turns retries off; must not be negative |
+| RetryDelay | TimeSpan | Wait before the first retry, doubling for each further retry with jitter, capped at 10 seconds; default 0.5 seconds; must not be negative |
+
+The connection checks its values when built: absolute http or https `Url`, non-blank `ApiKey`; its text form hides the key.
 
 ## Failures
 
+All derive from `ShopClientException`. `CatalogException` and `ShopUnavailableException` also carry the HTTP status (when the shop answered) and the underlying error. Bad arguments raise the standard argument exceptions instead.
+
 | Type | Meaning | Caller reaction |
 |------|---------|-----------------|
-| CatalogException | The shop rejected one record | Report it, continue |
-| ShopUnavailableException | The shop cannot be used at all (unreachable, timed out, wrong key) | Stop |
+| CatalogException | The shop rejected one record, answered with something that is not JSON, or an image file cannot be read | Report it, continue |
+| ShopUnavailableException | The shop cannot be used at all (unreachable, timed out, wrong key, 408/429/502/503/504), after retries | Stop |
 | UnsupportedShopException | Unknown shop type, or a capability the shop's client lacks | Usage error |
 
 ## Relationships

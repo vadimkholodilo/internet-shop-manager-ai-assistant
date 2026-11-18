@@ -16,13 +16,23 @@
 - Q: What does image upload take: a file path or the image content? → A: The file path, as today. The connector will not create products, so it will not upload images; only the loader does.
 - Q: One contract, or split into a general shop part and a catalog-loading part? → A: Split. A general shop contract (readiness) and a separate catalog-loading contract (category and product upsert, image upload); the OpenCart client implements both and the factory can create either.
 
+### Session 2026-11-19
+
+- Q: Should the library retry failed requests, and is that safe given that products must not be duplicated? → A: Yes. Every write is already an upsert by the item's stable key (SKU, slug), so repeating it is safe, with one gap: two overlapping writes for the same new key could both create it (for example a retry sent while the shop is still finishing the timed-out first request). The shop's catalog API therefore serializes writes per key, which makes retries safe.
+- Q: Which failures are retried? → A: Lost connections, per-attempt timeouts, and HTTP 408, 429, 500, 502, 503, 504. Never a rejection of the record (400, 404, 409, 415), a rejected API key (401) or a cancellation by the caller. A 500 is retried even though it may be permanent, because it is also how a transient shop error looks.
+- Q: Abstract base class with HTTP methods, or a helper? → A: A helper in the library that HTTP-based clients use; the contracts stay interfaces so a shop that does not use HTTP can still implement them.
+- Q: Add Polly? → A: No. One policy (status list, exponential backoff with jitter, `Retry-After`) is a few dozen lines; a dependency is not justified yet (Principle VII).
+- Q: Does the library validate its inputs and give consumers one exception family? → A: Yes. A common base for the library's shop failures carrying the HTTP status and the underlying error, argument checks before any request, and a connection that validates itself when built.
+
 ## Scope
 
 This feature is a refactoring. It moves the code that talks to a shop out of the loader into a library of its own, so that the loader and the future shop connector share one implementation instead of two.
 
 **In scope**: a shared library holding the shop-neutral contracts (general and catalog-loading), a factory, and the OpenCart implementation; switching the loader to use that library; moving the tests that belong to the client with it; documenting how to add a client for another shop.
 
-**Out of scope** (do not build now): the shop connector itself, its contract for the assistant, any operation the loader does not use today (product search, order creation, order status), a client for any shop other than OpenCart, and any change to the loader's visible behavior, the product file format, or the OpenCart extension.
+**Also in scope** (added 2026-11-19): resilience of the client (retries, input validation, a common failure type, bounded waiting) and the one change to the OpenCart extension it needs, serializing writes per key.
+
+**Out of scope** (do not build now): the shop connector itself, its contract for the assistant, any operation the loader does not use today (product search, order creation, order status), a client for any shop other than OpenCart, and any change to the loader's visible behavior (apart from retries), the product file format, or the OpenCart extension (apart from FR-018).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -93,19 +103,24 @@ A developer starting the shop connector project references the shared library an
 - **FR-001**: The shop client code MUST live in its own shared library, separate from the loader and from any consumer.
 - **FR-002**: The library MUST expose two shop-neutral contracts covering exactly the operations the loader uses today. The general shop contract has: wait until the shop is ready. The catalog-loading contract has: create or update a category, create or update a product (reporting whether it was created or updated and the shop's identifier), and upload a product image (given as a path to a local file, as today). A consumer MUST be able to use the general contract without the catalog-loading one, and a shop's client MAY implement the general contract alone.
 - **FR-003**: The library's public contracts and types MUST NOT contain any OpenCart-specific concept, other than OpenCart being one named shop type; all other OpenCart specifics MUST be confined to the OpenCart implementation.
-- **FR-004**: The library MUST contain an OpenCart implementation of both contracts that behaves identically to the client currently inside the loader (same requests, same authentication, same handling of per-record and whole-shop failures).
+- **FR-004**: The library MUST contain an OpenCart implementation of both contracts that behaves identically to the client currently inside the loader (same requests, same authentication, same handling of per-record and whole-shop failures), apart from the resilience added by FR-015 to FR-019.
 - **FR-005**: The library MUST distinguish a failure of one record (caller may continue) from the shop being unusable (caller must stop), through failure types defined in the library.
 - **FR-006**: The library MUST define its own shop-neutral category and product types, independent of the loader's product file format; the loader MUST convert its file records to them.
 - **FR-007**: The loader MUST use the library for all communication with the shop and MUST contain no shop-specific code, including the choice of client.
 - **FR-007a**: The library MUST provide a factory that creates a client for either contract from a shop type; adding a shop MUST NOT require changing the factory's callers. An unknown shop type MUST be rejected with a clear message listing the supported types.
 - **FR-007b**: The loader MUST accept an optional command-line flag naming the shop type; when it is absent the shop type MUST be OpenCart, so existing invocations behave exactly as before.
-- **FR-008**: The loader's observable behavior MUST NOT change, apart from the optional flag of FR-007b: arguments, environment settings, report format, messages, exit codes and the resulting shop content stay the same.
+- **FR-008**: The loader's observable behavior MUST NOT change, apart from the optional flag of FR-007b and the retries of FR-015: arguments, environment settings, report format, messages, exit codes and the resulting shop content stay the same.
 - **FR-009**: The loader MUST keep its current packaging (single self-contained executable, same container image and one-command start) after the change.
 - **FR-010**: The library MUST NOT depend on the loader, and MUST be referenceable by another project without bringing the loader along.
 - **FR-011**: The library MUST NOT access the shop's database; it uses only the shop's API (Principle II).
 - **FR-012**: Tests that cover client behavior MUST move out of the loader's tests and follow the constitution's testing rules (unit tests for logic that needs no shop, in the library's own unit test project; integration tests against the real shop, in the repository's one real-shop integration project, which owns the container setup; no stand-ins for the shop; shared helpers in the base classes). The loader's tests MUST cover only the loader's own behavior.
 - **FR-013**: The repository MUST document the library: its purpose, the contracts, who uses it, and how to add a client for another shop.
 - **FR-014**: The `tests` workflow MUST keep passing with the new projects included, and the README and agent context MUST reflect the new structure.
+- **FR-015**: Requests that fail in a way that may be temporary MUST be retried by the library: a lost connection, a request that exceeds its time limit, and HTTP 408, 429, 500, 502, 503 and 504. A rejection of the record (400, 404, 409, 415), a rejected API key (401) and a cancellation by the caller MUST NOT be retried. The number of retries MUST be configurable on the connection (default 3; 0 turns retries off) as MUST the wait before the first retry (default 0.5 s), waits between attempts MUST grow exponentially with jitter up to a cap of 10 s, and a `Retry-After` answer MUST be honored within that cap. Only requests that are safe to repeat (every request the library makes today) may be retried.
+- **FR-016**: When retries are exhausted the library MUST raise the same failure type as without retries, naming the number of attempts (when more than one) and keeping the last underlying error, so consumers need no new handling.
+- **FR-017**: Retry logic MUST live in a shared helper inside the library that any HTTP-based client can use; the contracts MUST NOT depend on HTTP, and no third-party resilience package is added.
+- **FR-018**: The OpenCart catalog API MUST serialize writes to the same item key (SKU, slug), so that two overlapping writes for one new key produce exactly one item. Writes to different keys MUST NOT wait for each other.
+- **FR-019**: The library MUST check its inputs before any request (null or blank keys and required fields, negative price or stock, a connection whose address is not an absolute http or https address, has a blank API key or a non-positive timeout) and raise the standard argument exceptions; every failure about a shop MUST derive from one library base failure type carrying the HTTP status (when there was an answer) and the underlying error; waiting for the shop to become ready MUST NOT exceed its overall timeout because of one slow attempt; an unreadable image file and an answer that is not valid JSON MUST be per-record failures; HTTP 408, 429, 502, 503 and 504 that persist after retries MUST be shop-unavailable failures.
 
 ### Key Entities
 
@@ -127,6 +142,8 @@ A developer starting the shop connector project references the shared library an
 - **SC-004**: A new project can use the client by adding one reference to the library, with 0 references to the loader and 0 copied files.
 - **SC-005**: A developer new to the repository can find where to add a client for another shop, and what it must implement, from the documentation alone in under 10 minutes.
 - **SC-006**: No client scenario is tested in two places: each behavior of the client is covered once, at the level that proves more.
+- **SC-007**: A shop that fails the first two attempts of a request and then answers causes no failed record and no duplicate; two simultaneous writes of the same new product produce exactly one product.
+- **SC-008**: A shop that never answers makes a request fail after (retries + 1) × the request time limit plus the waits, and never longer.
 
 ## Assumptions
 

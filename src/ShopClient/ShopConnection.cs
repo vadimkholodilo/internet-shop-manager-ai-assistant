@@ -6,6 +6,8 @@ namespace ShopClient;
 public sealed record ShopConnection
 {
     private readonly TimeSpan requestTimeout = TimeSpan.FromSeconds(60);
+    private readonly int maxRetries = 3;
+    private readonly TimeSpan retryDelay = TimeSpan.FromMilliseconds(500);
 
     /// <param name="url">Absolute http or https address of the shop.</param>
     /// <param name="apiKey">Credential for the shop's API; never logged.</param>
@@ -37,6 +39,33 @@ public sealed record ShopConnection
         {
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, TimeSpan.Zero);
             requestTimeout = value;
+        }
+    }
+
+    /// <summary>
+    /// How many times a request that failed in a temporary way (lost connection, timeout, 408, 429, 500, 502, 503, 504) is
+    /// repeated after the first attempt. 0 turns retries off.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
+    public int MaxRetries
+    {
+        get => maxRetries;
+        init
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            maxRetries = value;
+        }
+    }
+
+    /// <summary>The wait before the first retry; it doubles for each further retry (with jitter) up to 10 seconds.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
+    public TimeSpan RetryDelay
+    {
+        get => retryDelay;
+        init
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(value, TimeSpan.Zero);
+            retryDelay = value;
         }
     }
 

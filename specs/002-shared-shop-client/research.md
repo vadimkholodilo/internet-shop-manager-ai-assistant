@@ -54,3 +54,17 @@ Decisions that the spec left to the plan. No unresolved clarifications.
 ## R8. Documentation
 
 **Decision**: `src/ShopClient/README.md` covers purpose, the two contracts, who uses them, and "adding a shop" (new folder, implement the contract, register in `ShopType` and the factory, test through `ShopClientTests`). `README.md`, `CLAUDE.md` and `tests/README.md` are updated for the new structure.
+
+## R9. Retries (added 2026-11-19)
+
+**Decision**: An internal helper (`HttpRetry`, taking a function that builds a fresh request per attempt, because a sent request cannot be sent again) used by the OpenCart client. It retries lost connections, per-attempt timeouts, and 408, 429, 500, 502, 503, 504; waits 0.5 s, 1 s, 2 s... with jitter, capped at 10 s, honoring `Retry-After` within the cap. `ShopConnection.MaxRetries` (default 3, 0 disables) sets how many and `ShopConnection.RetryDelay` (default 0.5 s) the first wait. When exhausted it throws the failure it would have thrown without retries, with the attempt count in the message and the last error inside.
+**Rationale**: every request the client makes is idempotent by key (upsert by SKU or slug, image `PUT`, readiness `GET`), so repeating is safe; large imports and short container hiccups no longer end a run. A helper, not an abstract base class, keeps the contracts free of HTTP (a non-HTTP shop can still implement them).
+**Alternatives considered**: Polly (a dependency for one fixed policy; revisit if circuit breaking or hedging is ever needed); abstract base class with HTTP methods (couples the contract to HTTP); retrying only network errors (misses the 5xx blips of the shop container). Retrying 500 costs a few pointless attempts for a record that fails permanently with 500; accepted by the product owner.
+**Cost**: a request against a shop that hangs can take up to (MaxRetries + 1) × `RequestTimeout`, 4 minutes with the defaults, before the run stops.
+**Known effect**: if the first attempt succeeded but its answer was lost, the retry reports the item as updated, not created; the shop content is right, only a "created" count may be low.
+
+## R10. Serializing writes per key (added 2026-11-19)
+
+**Decision**: In the OpenCart extension, every write acquires a MariaDB named lock for the item key before it looks the item up (`GET_LOCK('catalog_api:product:<sku>', 10)`, and likewise for categories by slug; the product image write locks the SKU), and releases it after commit or rollback. If the lock is not obtained within 10 seconds the request answers `503`, which the client retries.
+**Rationale**: the extension looks an item up and then inserts it inside a transaction with no lock and no unique constraint, so two overlapping writes for a new key (typically a retry sent while the server is still finishing the timed-out first request) could both insert. A named lock needs no schema change to OpenCart's tables, is released when the connection ends, and different keys never wait for each other.
+**Alternatives considered**: a unique index on the product model (changes a core table, and URL keywords would still need their own check); a table lock (serializes everything).

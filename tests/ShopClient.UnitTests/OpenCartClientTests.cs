@@ -17,7 +17,7 @@ public sealed class OpenCartClientTests
         // The operating system completes the connection for a listening socket, but nothing ever answers the request.
         using var silent = new TcpListener(IPAddress.Loopback, 0);
         silent.Start();
-        using var client = new OpenCartClient(new ShopConnection(UrlOf(silent), "key") { RequestTimeout = TimeSpan.FromMilliseconds(300) });
+        using var client = new OpenCartClient(new ShopConnection(UrlOf(silent), "key") { RequestTimeout = TimeSpan.FromMilliseconds(300), MaxRetries = 0 });
 
         var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
 
@@ -31,7 +31,7 @@ public sealed class OpenCartClientTests
         closed.Start();
         var url = UrlOf(closed);
         closed.Stop();
-        using var client = new OpenCartClient(new ShopConnection(url, "key"));
+        using var client = new OpenCartClient(new ShopConnection(url, "key") { MaxRetries = 0 });
 
         var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
 
@@ -75,8 +75,8 @@ public sealed class OpenCartClientTests
     [Fact(Timeout = 15_000)]
     public async Task AGatewayErrorEndsTheRunInsteadOfFailingEveryRecord()
     {
-        using var shop = new CannedShop("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-        using var client = new OpenCartClient(new ShopConnection(shop.Url, "key"));
+        using var shop = new ScriptedShop(Status(503));
+        using var client = new OpenCartClient(new ShopConnection(shop.Url, "key") { MaxRetries = 0 });
 
         var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
 
@@ -87,7 +87,7 @@ public sealed class OpenCartClientTests
     public async Task ARejectionCarriesTheStatusAndTheShopsMessage()
     {
         const string body = "{\"error\":\"duplicate keyword\"}";
-        using var shop = new CannedShop($"HTTP/1.1 409 Conflict\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n{body}");
+        using var shop = new ScriptedShop(Json(409, "Conflict", body));
         using var client = new OpenCartClient(new ShopConnection(shop.Url, "key"));
 
         var error = await Assert.ThrowsAsync<CatalogException>(() => client.UpsertCategoryAsync(Category));
@@ -100,7 +100,7 @@ public sealed class OpenCartClientTests
     public async Task ASuccessAnswerThatIsNotJsonIsACatalogProblemNotACrash()
     {
         const string body = "<html>proxy</html>";
-        using var shop = new CannedShop($"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n{body}");
+        using var shop = new ScriptedShop($"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n{body}");
         using var client = new OpenCartClient(new ShopConnection(shop.Url, "key"));
 
         await Assert.ThrowsAsync<CatalogException>(() => client.UpsertCategoryAsync(Category));
@@ -121,12 +121,134 @@ public sealed class OpenCartClientTests
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => client.WaitUntilReadyAsync(TimeSpan.FromSeconds(-1)));
     }
 
-    /// <summary>A real socket that answers every request with one fixed raw HTTP response.</summary>
-    private sealed class CannedShop : IDisposable
+    private static string Status(int code, string headers = "") =>
+        $"HTTP/1.1 {code} X\r\n{headers}Content-Length: 0\r\nConnection: close\r\n\r\n";
+
+    private static string Json(int code, string reason, string body) =>
+        $"HTTP/1.1 {code} {reason}\r\nContent-Type: application/json\r\nContent-Length: {body.Length}\r\nConnection: close\r\n\r\n{body}";
+
+    private static ShopConnection Quick(ScriptedShop shop, int maxRetries = 3) =>
+        new(shop.Url, "key") { MaxRetries = maxRetries, RetryDelay = TimeSpan.FromMilliseconds(10) };
+
+    [Fact(Timeout = 15_000)]
+    public async Task TemporaryFailuresAreRetriedUntilTheShopAnswers()
+    {
+        using var shop = new ScriptedShop(Status(503), Status(500), Json(200, "OK", "{\"id\":5,\"created\":true}"));
+        using var client = new OpenCartClient(Quick(shop));
+
+        var result = await client.UpsertCategoryAsync(Category);
+
+        Assert.Equal(new UpsertResult(5, true), result);
+        Assert.Equal(3, shop.Requests);
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task ALostConnectionIsRetriedAndTheFinalFailureNamesTheAttempts()
+    {
+        using var closed = new TcpListener(IPAddress.Loopback, 0);
+        closed.Start();
+        var url = UrlOf(closed);
+        closed.Stop();
+        using var client = new OpenCartClient(new ShopConnection(url, "key") { MaxRetries = 2, RetryDelay = TimeSpan.FromMilliseconds(10) });
+
+        var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Contains("after 3 attempts", error.Message);
+        Assert.IsAssignableFrom<HttpRequestException>(error.InnerException);
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task ARepeatedlyUnavailableShopFailsAfterTheConfiguredAttempts()
+    {
+        using var shop = new ScriptedShop(Status(503));
+        using var client = new OpenCartClient(Quick(shop, maxRetries: 2));
+
+        var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Contains("after 3 attempts", error.Message);
+        Assert.Equal(3, shop.Requests);
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task APersistentInternalErrorIsACatalogFailureAfterTheRetries()
+    {
+        using var shop = new ScriptedShop(Json(500, "Internal Server Error", "{\"error\":\"Internal error\"}"));
+        using var client = new OpenCartClient(Quick(shop, maxRetries: 1));
+
+        var error = await Assert.ThrowsAsync<CatalogException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Contains("after 2 attempts", error.Message);
+        Assert.Equal(2, shop.Requests);
+    }
+
+    [Theory(Timeout = 15_000)]
+    [InlineData(400)]
+    [InlineData(404)]
+    [InlineData(409)]
+    [InlineData(415)]
+    public async Task ARejectedRecordIsNotRetried(int code)
+    {
+        using var shop = new ScriptedShop(Status(code));
+        using var client = new OpenCartClient(Quick(shop));
+
+        await Assert.ThrowsAsync<CatalogException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Equal(1, shop.Requests);
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task ARejectedApiKeyIsNotRetried()
+    {
+        using var shop = new ScriptedShop(Status(401));
+        using var client = new OpenCartClient(Quick(shop));
+
+        await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Equal(1, shop.Requests);
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task WithoutRetriesThereIsOneAttempt()
+    {
+        using var shop = new ScriptedShop(Status(503));
+        using var client = new OpenCartClient(Quick(shop, maxRetries: 0));
+
+        await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.Equal(1, shop.Requests);
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task RetryAfterIsHonored()
+    {
+        using var shop = new ScriptedShop(Status(503, "Retry-After: 1\r\n"), Json(200, "OK", "{\"id\":1}"));
+        using var client = new OpenCartClient(Quick(shop));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        await client.UpsertCategoryAsync(Category);
+
+        Assert.True(clock.Elapsed >= TimeSpan.FromMilliseconds(900), $"waited only {clock.Elapsed}");
+    }
+
+    [Fact(Timeout = 15_000)]
+    public async Task CancellingDuringAWaitBetweenAttemptsStopsRetrying()
+    {
+        using var shop = new ScriptedShop(Status(503));
+        using var client = new OpenCartClient(new ShopConnection(shop.Url, "key") { RetryDelay = TimeSpan.FromSeconds(5) });
+        using var cancelled = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.UpsertCategoryAsync(Category, cancelled.Token));
+
+        Assert.Equal(1, shop.Requests);
+    }
+
+    /// <summary>A real socket that answers the requests with fixed raw HTTP responses in order, repeating the last one.</summary>
+    private sealed class ScriptedShop : IDisposable
     {
         private readonly TcpListener listener = new(IPAddress.Loopback, 0);
+        private int requests;
 
-        public CannedShop(string response)
+        public ScriptedShop(params string[] responses)
         {
             listener.Start();
             Url = UrlOf(listener);
@@ -139,7 +261,8 @@ public sealed class OpenCartClientTests
                         using var connection = await listener.AcceptTcpClientAsync();
                         var stream = connection.GetStream();
                         await ReadRequestAsync(stream);
-                        await stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(response));
+                        var next = Math.Min(Interlocked.Increment(ref requests) - 1, responses.Length - 1);
+                        await stream.WriteAsync(System.Text.Encoding.UTF8.GetBytes(responses[next]));
                     }
                 }
                 catch (Exception e) when (e is ObjectDisposedException or SocketException or IOException)
@@ -150,6 +273,8 @@ public sealed class OpenCartClientTests
         }
 
         public Uri Url { get; }
+
+        public int Requests => requests;
 
         public void Dispose() => listener.Stop();
 

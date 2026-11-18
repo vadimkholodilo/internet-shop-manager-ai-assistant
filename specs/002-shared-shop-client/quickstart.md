@@ -36,3 +36,8 @@ dotnet build src/ShopClient
 ```
 
 Expected: the library builds alone; `ShopClientTests` upserts a category, a product and an image through the factory without calling loader code. Follow `src/ShopClient/README.md` "Adding a shop" to check it is understandable on its own.
+
+## 4. Temporary errors do not fail the run (resilience)
+
+Run `dotnet test tests/ShopClient.UnitTests` (a shop that fails twice, then answers, makes no failed record) and
+`dotnet test tests/ShopLoader.IntegrationTests --filter ShopClientTests` (two simultaneous writes of one new SKU leave one product).

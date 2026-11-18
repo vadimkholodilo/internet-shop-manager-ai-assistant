@@ -5,6 +5,8 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
+using ShopClient.Http;
+
 namespace ShopClient.OpenCart;
 
 /// <summary>
@@ -14,17 +16,17 @@ namespace ShopClient.OpenCart;
 internal sealed class OpenCartClient : ICatalogLoadingClient
 {
     private readonly HttpClient http;
-    private readonly TimeSpan requestTimeout;
+    private readonly ShopConnection connection;
 
     public OpenCartClient(ShopConnection connection)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
-        requestTimeout = connection.RequestTimeout;
+        this.connection = connection;
         http = new HttpClient
         {
             BaseAddress = new Uri(connection.Url.ToString().TrimEnd('/') + "/"),
-            Timeout = requestTimeout,
+            Timeout = connection.RequestTimeout,
         };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", connection.ApiKey);
     }
@@ -48,7 +50,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
 
             // One attempt never outlives the overall timeout, even when the shop accepts the connection and then hangs.
             using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            attempt.CancelAfter(remaining > TimeSpan.Zero && remaining < requestTimeout ? remaining : requestTimeout);
+            attempt.CancelAfter(remaining > TimeSpan.Zero && remaining < connection.RequestTimeout ? remaining : connection.RequestTimeout);
             try
             {
                 using var response = await http.GetAsync("catalog-api/categories", attempt.Token);
@@ -120,19 +122,25 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
             throw new CatalogException($"cannot read the image {imagePath}: {e.Message}", innerException: e);
         }
 
-        using var content = new ByteArrayContent(bytes);
-        content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-
-        using var response = await SendAsync(HttpMethod.Put, $"catalog-api/products/{Uri.EscapeDataString(sku)}/image", content, cancellationToken);
-        await EnsureSuccessAsync(response, cancellationToken);
+        var (response, attempts) = await HttpRetry.SendAsync(http, connection, () => new HttpRequestMessage(HttpMethod.Put, $"catalog-api/products/{Uri.EscapeDataString(sku)}/image")
+        {
+            Content = new ByteArrayContent(bytes) { Headers = { ContentType = new MediaTypeHeaderValue(contentType) } },
+        }, cancellationToken);
+        using (response)
+        {
+            await EnsureSuccessAsync(response, attempts, cancellationToken);
+        }
     }
 
     private async Task<UpsertResult> PutJsonAsync<T>(
         string path, T body, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo, CancellationToken cancellationToken)
     {
-        using var content = JsonContent.Create(body, typeInfo);
-        using var response = await SendAsync(HttpMethod.Put, path, content, cancellationToken);
-        await EnsureSuccessAsync(response, cancellationToken);
+        var (response, attempts) = await HttpRetry.SendAsync(http, connection, () => new HttpRequestMessage(HttpMethod.Put, path)
+        {
+            Content = JsonContent.Create(body, typeInfo),
+        }, cancellationToken);
+        using var _ = response;
+        await EnsureSuccessAsync(response, attempts, cancellationToken);
 
         ItemResponse? item;
         try
@@ -150,26 +158,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
             : new UpsertResult(item.Id, item.Created ?? false);
     }
 
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, HttpContent content, CancellationToken cancellationToken)
-    {
-        try
-        {
-            using var request = new HttpRequestMessage(method, path) { Content = content };
-            return await http.SendAsync(request, cancellationToken);
-        }
-        catch (HttpRequestException e)
-        {
-            throw new ShopUnavailableException($"Lost connection to the shop: {e.Message}", e.StatusCode, e);
-        }
-        catch (OperationCanceledException e) when (!cancellationToken.IsCancellationRequested)
-        {
-            // HttpClient reports its own timeout this way. A shop that stops answering ends the run like a lost
-            // connection does, instead of making every remaining record wait for the timeout.
-            throw new ShopUnavailableException($"The shop did not answer within {requestTimeout.TotalSeconds:0.##} seconds.", innerException: e);
-        }
-    }
-
-    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, int attempts, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode)
         {
@@ -179,10 +168,12 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
         {
             throw new ShopUnavailableException("The shop rejected the API key (401).", response.StatusCode);
         }
-        if (response.StatusCode is HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
+        if (response.StatusCode is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
+            or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
         {
             // The shop, or the proxy in front of it, says it cannot serve anyone right now; this is not about the record.
-            throw new ShopUnavailableException($"The shop is not available (HTTP {(int)response.StatusCode}).", response.StatusCode);
+            throw new ShopUnavailableException(
+                $"The shop is not available (HTTP {(int)response.StatusCode}){HttpRetry.Attempts(attempts)}.", response.StatusCode);
         }
 
         var message = $"HTTP {(int)response.StatusCode}";
@@ -199,7 +190,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
             // Not a JSON error body; the status code is enough.
         }
 
-        throw new CatalogException(message, response.StatusCode);
+        throw new CatalogException(message + HttpRetry.Attempts(attempts), response.StatusCode);
     }
 
     private static string Truncate(string text) => text.Length <= 500 ? text : text[..500] + "…";
