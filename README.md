@@ -73,13 +73,16 @@ produces the AOT binary. Tests: `dotnet test` runs unit tests and integration te
 and MariaDB containers with Testcontainers (Docker required, the first run builds the images).
 `tools/smoke-test.sh` runs the real `docker compose up -d` demo and checks the result.
 
-CI checks formatting with `dotnet format --verify-no-changes` and PHP syntax with `tools/lint-php.sh`. A pre-commit hook formats the staged C# files for
-you; enable it once per clone with `git config core.hooksPath .githooks`.
+**Quality checks.** The same checks run wherever code changes, so quality does not depend on who edits:
 
-Claude Code also checks its own changes before finishing a turn (`.claude/hooks/check-code.sh`): `dotnet build` for C#,
-`php -l` for PHP, and for Docker files `hadolint`, `docker build --check`, `docker compose config` and
-`trivy config` (HIGH and CRITICAL). Install the linters with `brew install hadolint trivy`; a missing one is skipped.
-Findings accepted on purpose are listed with reasons in `.hadolint.yaml` and `.trivyignore.yaml`.
+- `tools/check-changed.sh` checks the files it is given: `dotnet build` for C#, `php -l` for PHP, and for Docker files
+  `hadolint`, `docker build --check`, `docker compose config` and `trivy config` (HIGH and CRITICAL). Findings accepted on
+  purpose are listed with reasons in `.hadolint.yaml` and `.trivyignore.yaml`.
+- A pre-commit hook formats the staged C# files and then runs that script on the staged files. Enable it once per
+  clone with `git config core.hooksPath .githooks`, and install the linters with `brew install hadolint trivy`
+  (a missing linter is reported and skipped). `git commit --no-verify` skips it.
+- Claude Code runs the same script on its changes before finishing a turn (`.claude/hooks/check-code.sh`).
+- CI is the final gate: `dotnet format --verify-no-changes`, `tools/lint-php.sh`, and the tests.
 
 How it is built is described in [`specs/001-test-shop/`](specs/001-test-shop/plan.md).
 
