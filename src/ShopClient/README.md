@@ -28,11 +28,21 @@ Callers never name a client class; they pick a `ShopType` (the loader reads it f
 
 ## Failures
 
+Everything the library reports about a shop derives from `ShopClientException`, so one `catch` covers it all.
+
 | Exception | Meaning | Caller reaction |
 |-----------|---------|-----------------|
-| `CatalogException` | the shop rejected one record | report it and continue |
-| `ShopUnavailableException` | the shop cannot be used at all (unreachable, timed out, wrong API key) | stop |
+| `CatalogException` | the shop rejected one record, answered with something that is not valid JSON, or an image file could not be read; `StatusCode` holds the HTTP status when there was an answer | report it and continue |
+| `ShopUnavailableException` | the shop cannot be used at all (unreachable, timed out, wrong API key, 502/503/504); `StatusCode` is set when it answered, `InnerException` holds the network error | stop |
 | `UnsupportedShopException` | unknown shop type, or a capability the shop's client lacks | usage error |
+
+A bad argument is a programming error, not a shop failure, and raises the usual `ArgumentNullException`,
+`ArgumentException` or `ArgumentOutOfRangeException` before any request is made. `ShopConnection` checks its values when it
+is built (absolute http(s) URL, non-blank API key, positive `RequestTimeout`), and its `ToString()` hides the API key.
+Cancelling through the token raises `OperationCanceledException`, never `ShopUnavailableException`.
+
+`WaitUntilReadyAsync(timeout)` tries at least once and returns or throws within `timeout` (plus at most one request), however long the shop
+takes to answer each attempt.
 
 ## Adding a shop
 

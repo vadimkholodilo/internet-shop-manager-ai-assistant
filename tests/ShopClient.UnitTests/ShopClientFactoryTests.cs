@@ -37,4 +37,22 @@ public sealed class ShopClientFactoryTests
     [InlineData("")]
     [InlineData(null)]
     public void UnknownShopTypeNamesAreRejected(string? text) => Assert.False(ShopType.TryParse(text, out _));
+
+    [Fact]
+    public void ANullConnectionIsRejected() =>
+        Assert.Throws<ArgumentNullException>(() => ShopClientFactory.CreateShopClient(ShopType.OpenCart, null!));
+
+    [Fact]
+    public void ABadConnectionIsRejectedWhenItIsBuilt()
+    {
+        Assert.Throws<ArgumentNullException>(() => new ShopConnection(null!, "key"));
+        Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("/relative", UriKind.Relative), "key"));
+        Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("ftp://shop.example"), "key"));
+        Assert.Throws<ArgumentException>(() => new ShopConnection(new Uri("http://shop.example"), " "));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ShopConnection(new Uri("http://shop.example"), "key") { RequestTimeout = TimeSpan.Zero });
+    }
+
+    [Fact]
+    public void TheApiKeyIsNeverPrinted() =>
+        Assert.DoesNotContain("secret-key", new ShopConnection(new Uri("http://shop.example"), "secret-key").ToString());
 }

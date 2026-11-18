@@ -8,7 +8,7 @@ Signatures describe intent; exact names are settled in implementation but the sh
 ```csharp
 public interface IShopClient : IDisposable
 {
-    // Returns when the shop answers; throws ShopUnavailableException after `timeout` or on a rejected API key.
+    // Returns when the shop answers; throws ShopUnavailableException after `timeout` in total or on a rejected API key.
     Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken = default);
 }
 
@@ -16,7 +16,7 @@ public interface ICatalogLoadingClient : IShopClient
 {
     Task<UpsertResult> UpsertCategoryAsync(CatalogCategory category, CancellationToken cancellationToken = default);
     Task<UpsertResult> UpsertProductAsync(CatalogProduct product, CancellationToken cancellationToken = default);
-    // Path to a local file: png, jpg/jpeg or webp. Other types throw CatalogException.
+    // Path to a local file: png, jpg/jpeg or webp. Other types, and files that cannot be read, throw CatalogException.
     Task UploadImageAsync(string sku, string imagePath, CancellationToken cancellationToken = default);
 }
 
@@ -33,18 +33,23 @@ public readonly record struct ShopType
     public static bool TryParse(string? name, out ShopType type);   // case-insensitive
 }
 
-public sealed record ShopConnection(Uri Url, string ApiKey)
+public sealed record ShopConnection
 {
-    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(60);   // overridable per connection
+    // Validated on construction: absolute http(s) Url, non-blank ApiKey (ArgumentException family); ToString hides the key.
+    public ShopConnection(Uri url, string apiKey);
+    public Uri Url { get; }
+    public string ApiKey { get; }
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(60);   // overridable; must be positive
 }
 public sealed record UpsertResult(long Id, bool Created);
 public sealed record CatalogCategory(string Slug, string Name, string? Parent);
 public sealed record CatalogProduct(string Sku, string Name, string Category, string Brand, string Description,
     IReadOnlyDictionary<string, string> Attributes, decimal Price, int Quantity);
 
-public sealed class CatalogException(string message) : Exception(message);
-public sealed class ShopUnavailableException(string message) : Exception(message);
-public sealed class UnsupportedShopException(string message) : Exception(message);
+public abstract class ShopClientException(string message, Exception? innerException = null) : Exception(message, innerException);
+public sealed class CatalogException : ShopClientException { public HttpStatusCode? StatusCode { get; } }
+public sealed class ShopUnavailableException : ShopClientException { public HttpStatusCode? StatusCode { get; } }
+public sealed class UnsupportedShopException : ShopClientException;
 ```
 
 ## Conventions
@@ -55,7 +60,9 @@ does not need to write `CancellationToken.None`.
 ## Behavioral guarantees
 
 - Upserts are idempotent: the same key updates, never duplicates; `Created` tells which happened.
-- A rejected single record raises `CatalogException`; a lost connection, timeout or `401` raises `ShopUnavailableException`. Messages are the same as the loader printed before.
+- A rejected single record, an unreadable image file or a non-JSON answer raises `CatalogException`; a lost connection, timeout, `401` or `502/503/504` raises `ShopUnavailableException`. Both carry the HTTP status when there was an answer and the original exception as `InnerException`.
+- A bad argument (null, blank key fields, negative price or quantity, non-positive timeout) raises the `ArgumentException` family before any request is made.
+- `WaitUntilReadyAsync(timeout)` tries at least once and does not run past `timeout` because of a slow attempt.
 - The library never opens a database connection and holds no static shop state, so several clients for different shops can coexist.
 
 ## Loader command line (changed surface)
