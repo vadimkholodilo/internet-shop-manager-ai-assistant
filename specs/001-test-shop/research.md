@@ -27,7 +27,7 @@ Items marked **Resolved** were settled by experiment during implementation (Open
   fallback objects, because admin models call each other through `$this->load->model()` and would otherwise
   resolve same-named catalog models. Authentication is a bearer token compared with `SHOP_API_KEY` (passed
   to PHP with Apache `PassEnv`). Writes run in a database transaction and roll back on any error. The SKU is
-  stored in the product's `model` field and the category slug as its SEO keyword.
+  stored in the product's `model` field and the category slug as its SEO keyword. Writes go through the admin models; lookups and listings use read-only `SELECT`s inside the shop's own process. OpenCart prints stored text as HTML, so the extension stores text HTML-encoded (descriptions encoded twice, because the storefront decodes them once as rich text) and decodes it again in API responses.
 
 ## R2. Getting an OpenCart image
 

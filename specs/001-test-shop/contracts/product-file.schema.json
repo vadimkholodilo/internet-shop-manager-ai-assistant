@@ -8,7 +8,6 @@
     "source": { "type": "string" },
     "categories": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["slug", "name"],
@@ -22,7 +21,6 @@
     },
     "products": {
       "type": "array",
-      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["sku", "name", "category", "brand", "description", "price", "quantity", "image"],
@@ -31,7 +29,7 @@
           "name": { "type": "string", "minLength": 1 },
           "category": { "type": "string" },
           "brand": { "type": "string", "minLength": 1 },
-          "description": { "type": "string" },
+          "description": { "type": "string", "minLength": 1 },
           "attributes": { "type": "object", "additionalProperties": { "type": "string" } },
           "price": { "type": "number", "exclusiveMinimum": 0 },
           "quantity": { "type": "integer", "minimum": 0 },

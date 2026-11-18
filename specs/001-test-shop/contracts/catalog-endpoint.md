@@ -33,14 +33,17 @@ Product: `{ "id": 345, "sku": "SM-0001", "name": "...", "category_id": 12, "cate
 | Upsert category | `PUT /catalog-api/categories/{slug}` body: `name`, `parent` (slug) | `200` category representation plus `"created": bool` | `400` invalid, `404` unknown parent, `401` |
 | Get category | `GET /catalog-api/categories/{slug}` or `GET /catalog-api/categories/by-id/{id}` | `200` category representation | `404`, `401` |
 | List categories | `GET /catalog-api/categories?page=n` | `200` `{ items, total }` of category representations | `401` |
-| Upsert product | `PUT /catalog-api/products/{sku}` body: `name`, `category` (slug), `brand`, `description`, `attributes`, `price`, `quantity` | `200` product representation plus `"created": bool` | `400` invalid, `404` unknown category, `401` |
+| Upsert product | `PUT /catalog-api/products/{sku}` body: `name`, `category` (slug), `brand`, `description`, `attributes`, `price`, `quantity` | `200` product representation plus `"created": bool` | `400` invalid, `404` unknown category, `409` SKU maps to the URL keyword of another product, `401` |
 | Get product | `GET /catalog-api/products/{sku}` or `GET /catalog-api/products/by-id/{id}` | `200` product representation | `404`, `401` |
 | List products | `GET /catalog-api/products?page=n` | `200` `{ items, total }` of product representations | `401` |
-| Upload image | `PUT /catalog-api/products/{sku}/image` body: image bytes, `Content-Type` | `200` product representation | `404` unknown product, `415` bad type, `401` |
+| Upload image | `PUT /catalog-api/products/{sku}/image` body: image bytes, `Content-Type` | `200` product representation | `404` unknown product, `415` bad type, `400` not a valid image, `401` |
 
 ## Rules
 
 - Upserts are keyed by `slug` and `sku`; repeating a call with the same data changes nothing.
 - Ids are assigned by the shop, never accepted in requests, and stay the same across upserts of the same item.
-- Text is UTF-8; Cyrillic must round-trip unchanged.
+- Text is UTF-8; Cyrillic and markup characters such as `<` must round-trip unchanged. The shop stores text HTML-encoded and the API decodes it, so catalog text can never become markup on the storefront.
+- A SKU becomes the product's URL keyword and photo file name (lower case, anything but letters and digits replaced by `-`); two SKUs that map to the same keyword conflict (`409`). SKUs are compared ignoring case.
+- Updating a product keeps the settings the API does not manage (status, sort order, availability date, weights and so on) and its photos, and replaces its category and attributes with the ones sent. Discounts, specials, options and other related records are not managed: an update removes them.
+- Lists are paged by 50 items (`?page=n`, from 1).
 - The get and list operations exist so tests and the loader can verify results without reading the database.

@@ -42,14 +42,14 @@ real OpenCart and MariaDB containers
 | Principle | Status | Notes |
 |-----------|--------|-------|
 | I. .NET-first backend | Pass | Loader and tests in .NET 10, loader as a Native AOT binary. PHP only for the OpenCart extension, which runs inside OpenCart; no Python. |
-| II. Integrate, never replace | Pass with deviation | Uses OpenCart, no database access. The loader calls the extension endpoint directly instead of a connector; see Complexity Tracking. |
+| II. Integrate, never replace | Pass with deviation | The loader and the tests use only the shop's API. The loader calls the extension endpoint directly instead of a connector, and shop provisioning configures the new shop with SQL; see Complexity Tracking. |
 | III. Grounded and safe assistant | N/A | No assistant behaviour in this slice. |
 | IV. Human in the loop | N/A | Not touched. |
 | V. Test-first | Pass | Unit and Testcontainers integration tests, run in the `tests` workflow. |
 | VI. Language policy | Pass | English docs and code; the sample catalog content is Russian. |
 | VII. Incremental simplicity | Pass | Public address, connector, orders and reset deferred. |
 | VIII. Infrastructure as code | Pass | Everything defined in compose files and Dockerfiles; no manual steps. |
-| IX. Containers with dev overrides | Pass | `docker-compose.yml` plus `docker-compose.dev.yml` exposing shop and database ports. |
+| IX. Containers with dev overrides | Pass | `docker-compose.yml` (shop on localhost) plus `docker-compose.dev.yml` also exposing the database on localhost. |
 
 Post-design re-check: unchanged; the only deviation is the one below.
 
@@ -104,3 +104,4 @@ infrastructure lives under `shop/`, so the loader's OpenCart-specific HTTP code 
 |-----------|------------|-------------------------------------|
 | Loader calls the OpenCart extension directly, not via a connector (Principle II) | The connector is deferred to the next feature to keep this slice small | Building the connector now would add the contract design to a slice meant to prove only the one-command demo. The OpenCart-specific code is isolated in one class so it moves into the connector later. |
 | Custom PHP extension inside OpenCart | OpenCart core has no catalog write API | A third-party API extension is unverified and may be paid; driving the admin UI with form posts is fragile; direct database writes are forbidden. |
+| `shop/provision.sh` sets up the new demo shop (language, currency, store details, removal of OpenCart's demo content, registration of the extension) with SQL (Principle II: no database access) | OpenCart has no API for settings, languages or currencies, and its CLI installer cannot install Russian. This is provisioning of the shop itself, run once when the shop is created; nothing that integrates with the shop (the loader, the tests, later the assistant) touches the database. Store details are written once, so later edits in the admin area are kept. | Clicking through the admin area by hand breaks Principle VIII (no manual steps); a script that drives the admin UI is fragile and needs the same credentials. |
