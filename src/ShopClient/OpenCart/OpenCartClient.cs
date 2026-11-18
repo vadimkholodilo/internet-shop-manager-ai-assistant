@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+
 namespace ShopClient.OpenCart;
 
 /// <summary>
@@ -20,7 +21,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
         http = new HttpClient
         {
             BaseAddress = new Uri(connection.Url.ToString().TrimEnd('/') + "/"),
-            Timeout = this.requestTimeout,
+            Timeout = requestTimeout,
         };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", connection.ApiKey);
     }

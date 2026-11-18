@@ -79,4 +79,24 @@ public sealed class CliTests : UnitTest
         Assert.Equal(2, run.Exit);
         Assert.Contains("--wait-seconds", run.Error);
     }
+
+    [Theory]
+    [InlineData("nope")]
+    [InlineData("")]
+    public async Task ShopMustBeASupportedKind(string value)
+    {
+        var run = await RunCliAsync("--file", "x.json", "--url", "http://shop", "--api-key", "k", "--shop", value);
+
+        Assert.Equal(2, run.Exit);
+        Assert.Contains("--shop", run.Error);
+        Assert.Contains("opencart", run.Error);
+    }
+
+    [Fact]
+    public async Task ShopKindIsCaseInsensitive()
+    {
+        var run = await RunCliAsync("--file", Path.Combine(Workspace.Path, "none.json"), "--url", "http://shop", "--api-key", "k", "--shop", "OpenCart");
+
+        Assert.Contains("not found", run.Error);
+    }
 }

@@ -7,9 +7,17 @@ public static class ShopClientFactory
 {
     public static IShopClient CreateShopClient(ShopType type, ShopConnection connection) => Create(type, connection);
 
-    public static ICatalogLoadingClient CreateCatalogLoadingClient(ShopType type, ShopConnection connection) =>
-        Create(type, connection) as ICatalogLoadingClient
-        ?? throw new UnsupportedShopException($"The {type} shop does not support loading a catalog.");
+    public static ICatalogLoadingClient CreateCatalogLoadingClient(ShopType type, ShopConnection connection)
+    {
+        var client = Create(type, connection);
+        if (client is ICatalogLoadingClient loading)
+        {
+            return loading;
+        }
+
+        client.Dispose();
+        throw new UnsupportedShopException($"The {type} shop does not support loading a catalog.");
+    }
 
     private static IShopClient Create(ShopType type, ShopConnection connection) =>
         type == ShopType.OpenCart

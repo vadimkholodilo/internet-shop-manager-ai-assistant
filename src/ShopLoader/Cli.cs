@@ -21,10 +21,10 @@ internal static class Cli
             Description = "API key of the shop (default: SHOP_API_KEY environment variable)",
             DefaultValueFactory = _ => Environment.GetEnvironmentVariable("SHOP_API_KEY"),
         };
-        var shop = new Option<string>("--shop")
+        var shop = new Option<ShopType>("--shop")
         {
             Description = $"kind of shop to load into: {string.Join(", ", ShopType.SupportedNames)}",
-            DefaultValueFactory = _ => ShopType.Default.Name,
+            DefaultValueFactory = _ => ShopType.Default,
             CustomParser = ParseShopType,
         };
         var imagesDirectory = new Option<string?>("--images-dir")
@@ -75,7 +75,7 @@ internal static class Cli
         return await parseResult.InvokeAsync(new InvocationConfiguration { Output = output, Error = error }, cancellationToken);
     }
 
-    private sealed record Options(string File, Uri Url, string ApiKey, string Shop, string? ImagesDirectory, int WaitSeconds);
+    private sealed record Options(string File, Uri Url, string ApiKey, ShopType Shop, string? ImagesDirectory, int WaitSeconds);
 
     private static Uri? ParseHttpUrl(System.CommandLine.Parsing.ArgumentResult result)
     {
@@ -90,16 +90,16 @@ internal static class Cli
         return null;
     }
 
-    private static string ParseShopType(System.CommandLine.Parsing.ArgumentResult result)
+    private static ShopType ParseShopType(System.CommandLine.Parsing.ArgumentResult result)
     {
         var text = result.Tokens.Count == 1 ? result.Tokens[0].Value : null;
         if (ShopType.TryParse(text, out var type))
         {
-            return type.Name;
+            return type;
         }
 
         result.AddError($"--shop must be one of: {string.Join(", ", ShopType.SupportedNames)}");
-        return ShopType.Default.Name;
+        return ShopType.Default;
     }
 
     private static int ParseSeconds(System.CommandLine.Parsing.ArgumentResult result)
@@ -130,8 +130,7 @@ internal static class Cli
 
         try
         {
-            ShopType.TryParse(options.Shop, out var shopType);
-            using var shop = ShopClientFactory.CreateCatalogLoadingClient(shopType, new ShopConnection(options.Url, options.ApiKey));
+            using var shop = ShopClientFactory.CreateCatalogLoadingClient(options.Shop, new ShopConnection(options.Url, options.ApiKey));
             await shop.WaitUntilReadyAsync(TimeSpan.FromSeconds(options.WaitSeconds), cancellationToken);
 
             var report = await new Loader(shop, output).LoadAsync(validation, imagesDirectory, cancellationToken);
