@@ -1,4 +1,4 @@
-# Feature Specification: Test Electronics Shop
+# Feature Specification: Test Electronics Shop (Local Demo)
 
 **Feature Branch**: `001-test-shop`
 
@@ -6,190 +6,156 @@
 
 **Status**: Draft
 
-**Input**: User description: "Test electronics shop for development and demos of the AI shop assistant. A working, publicly reachable Russian-language test internet shop that sells electronics, so that people and the assistant can browse a catalog, place orders and see order statuses. The shop is a demo environment for a series of blog posts, so readers must be able to set it up with a single command and have it running, with a public address available even for non-technical users. The shop is built on the OpenCart CMS. Because the AI assistant must not be tied to one shop, every operation on the shop goes through a shop connector, so adding another shop later means writing only a new connector."
+**Input**: User description: "Smallest useful slice of the test shop: run an OpenCart shop locally with `docker-compose up -d`, load products into it from a JSON file with a loader script, and include a small generated sample catalog so a working Russian-language demo shop comes up with a single command. Everything else (public address, connector, order API, scraped catalog) comes in later features."
+
+## Scope
+
+This feature is deliberately small. It proves that a seeded demo shop can be started with one command.
+
+**In scope**: OpenCart running in containers, a loader that fills the shop from a JSON file through the shop's API, a small generated sample catalog in Russian, a development configuration that exposes ports.
+
+**Deferred to later features** (do not build now): public address for the shop, the shop connector and its shop-neutral contract, order creation and order status via an external service, administrator status flows, stub payments, reset command, a large catalog snapshot from a real retailer.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Browse a realistic electronics catalog (Priority: P1)
+### User Story 1 - Start a seeded demo shop with one command (Priority: P1)
 
-A visitor opens the test shop in a browser and sees a Russian-language electronics store with categories and products. Each product has a name, brand, photo, price in rubles, key attributes and availability. The catalog looks like a real electronics retailer's, with enough variety (categories, brands, price ranges) to test product-selection conversations.
+A developer or blog reader clones the repository and runs `docker-compose up -d`. After the services finish starting, the shop is available in a browser on the local machine and already contains the sample products, with no further manual steps.
 
-**Why this priority**: Without a populated, reachable shop, nothing else, including the AI assistant, can be built or tested.
+**Why this priority**: This is the whole point of the slice: an easy, reproducible demo shop for the blog series and for development.
 
-**Independent Test**: Open the public address, navigate through categories, open product pages, and verify that products are in Russian, priced in rubles, have photos and show availability.
+**Independent Test**: On a clean machine with Docker, run `docker-compose up -d`, wait until it finishes, open the local shop address and browse the sample catalog.
 
 **Acceptance Scenarios**:
 
-1. **Given** the shop is deployed and seeded, **When** a visitor opens its public address, **Then** they see a Russian-language storefront with electronics categories.
-2. **Given** a category, **When** the visitor opens it, **Then** they see products with name, photo, price in rubles and availability.
-3. **Given** a product page, **When** the visitor opens it, **Then** they see the brand, attributes and description from the seeded data.
-4. **Given** the seeded catalog, **When** it is inspected, **Then** it spans multiple categories, multiple brands per category and a wide price range.
+1. **Given** a clean machine with Docker installed, **When** the user runs `docker-compose up -d`, **Then** OpenCart is installed and configured automatically with no manual installer steps.
+2. **Given** the services have started, **When** the user opens the documented local address, **Then** a Russian-language storefront with the sample categories and products is shown.
+3. **Given** the stack was already started and seeded, **When** `docker-compose up -d` is run again, **Then** nothing is duplicated and the shop keeps working.
+4. **Given** a required local port is already in use, **When** the stack starts, **Then** the failure is clear and documented, with a documented way to change the port.
 
 ---
 
-### User Story 0 - One-command setup with a public address (Priority: P1)
+### User Story 2 - Load products from a JSON file through the shop API (Priority: P1)
 
-A blog reader, who may be non-technical, clones the repository, runs a single documented command and gets a working, seeded shop with a public web address they can open in a browser or share, without configuring domains, DNS, certificates or router ports. All steps that can be automated (starting services, installing and configuring OpenCart, enabling the programmatic interface, creating service credentials, seeding the catalog, publishing the address) are automated.
+A developer runs the loader, which reads a JSON file of categories and products and creates them in the shop using only the shop's official programmatic interface. Running it again does not create duplicates: existing items are updated and new ones are added. The loader also runs automatically as part of `docker-compose up -d`.
 
-**Why this priority**: The project is a blog-post series; if readers cannot get the shop running easily, the series loses its value.
+**Why this priority**: Makes the catalog reproducible and swappable (the sample data now, a real snapshot later) and proves that the shop can be filled without touching its database.
 
-**Independent Test**: On a clean machine with only the documented prerequisites, run the single command, wait for it to finish and open the printed public address.
-
-**Acceptance Scenarios**:
-
-1. **Given** a clean machine with only the documented prerequisites, **When** the reader runs the single setup command, **Then** it finishes without further manual steps and prints the public address of the shop, the administration address and the service credentials.
-2. **Given** the setup has finished, **When** the reader opens the printed public address from another device, **Then** the seeded Russian-language storefront is shown.
-3. **Given** a setup that was interrupted, **When** the reader runs the command again, **Then** it completes safely without duplicating data or breaking the existing installation.
-4. **Given** a required prerequisite is missing, **When** the command runs, **Then** it stops early with a clear message that says what to install.
-
----
-
-### User Story 2 - Seed the shop from a data snapshot through its API (Priority: P1)
-
-A developer runs a single loader script that reads the product snapshot file and fills the shop with categories, products, images, prices and stock, through the shop connector, which uses only the shop's official programmatic interface. Running the script again does not create duplicates: existing items are updated and new items are added.
-
-**Why this priority**: The catalog must be reproducible. It also proves that everything the assistant later needs can be done through the official interface.
-
-**Independent Test**: Start from an empty shop, run the loader, count items; run it again and verify the counts are unchanged.
+**Independent Test**: Start an empty shop, run the loader, count items; run it again and verify the counts are unchanged.
 
 **Acceptance Scenarios**:
 
-1. **Given** an empty shop and a valid snapshot file, **When** the loader runs, **Then** all categories, products, images, prices and stock levels from the file appear in the shop.
+1. **Given** an empty shop and a valid JSON file, **When** the loader runs, **Then** all categories, products, images, prices and stock levels from the file appear in the shop.
 2. **Given** an already seeded shop, **When** the loader runs again with the same file, **Then** no duplicate categories or products are created.
-3. **Given** a snapshot where one product's price changed, **When** the loader runs, **Then** that product's price is updated and no other product changes.
-4. **Given** a malformed record in the snapshot, **When** the loader runs, **Then** it reports which record failed and continues with the rest.
+3. **Given** a file where one product's price changed, **When** the loader runs, **Then** that product's price is updated and no other product changes.
+4. **Given** a malformed record in the file, **When** the loader runs, **Then** it reports which record failed and continues with the rest.
 5. **Given** the loader, **When** it runs, **Then** it never reads or writes the shop's database directly.
 
 ---
 
-### User Story 3 - External service reads the catalog and manages orders via the shop connector (Priority: P1)
+### User Story 3 - Generated sample catalog (Priority: P2)
 
-An external service, authenticated with its own credentials, can read the catalog, create orders for a customer, read an order's current status, and detect status changes, all through the shop connector and never by calling the shop directly. This is what the AI assistant will use. The connector exposes a shop-neutral contract, and only the OpenCart implementation of it knows about OpenCart.
+The repository includes a small generated sample catalog in the JSON format: a few electronics categories and a few dozen products with Russian names, brands, attributes, prices in rubles, stock and placeholder photos. It is clearly marked as generated, not copied from a real retailer.
 
-**Why this priority**: The assistant depends on exactly these capabilities, so the shop is not usable for the main project without them.
+**Why this priority**: Gives User Stories 1 and 2 realistic data now, without the effort and legal questions of a real snapshot.
 
-**Independent Test**: Using only the service credentials, list products, create an order, read its status, change the status as an administrator, and read the new status.
+**Independent Test**: Open the JSON file, validate it against the documented format, and see the products in the running shop.
 
 **Acceptance Scenarios**:
 
-1. **Given** valid service credentials, **When** the service requests the catalog, **Then** it receives products with name, category, brand, attributes, price, photo and availability.
-2. **Given** valid service credentials, **When** the service creates an order with customer details, items and delivery method, **Then** the order exists in the shop with those details and a unique identifier.
-3. **Given** an existing order, **When** the service asks for its status, **Then** it receives the current status.
-4. **Given** an order whose status was changed by an administrator, **When** the service checks it, **Then** it can detect the change and read the new status.
-5. **Given** missing or invalid credentials, **When** a request is made, **Then** it is rejected and no data is exposed or changed.
-6. **Given** the connector contract, **When** a developer inspects the loader and the consuming service, **Then** neither contains OpenCart-specific code or calls the shop's API directly.
-7. **Given** a second shop were to be added, **When** a developer plans the work, **Then** only a new connector implementing the same contract is needed, with no changes to the loader or the consuming service.
+1. **Given** the sample file, **When** it is inspected, **Then** it has at least 3 categories, at least 3 brands and at least 20 products, all in Russian with prices in rubles.
+2. **Given** the sample file, **When** it is validated, **Then** every product has name, category, brand, attributes, price, availability and a photo.
+3. **Given** the sample file, **When** the loader loads it, **Then** the products display in the shop with their photos.
 
 ---
 
-### User Story 4 - Administrator changes order status and gets a stub payment link (Priority: P2)
+### User Story 4 - Develop against the stack from outside the containers (Priority: P2)
 
-A shop administrator can see orders and move them through statuses (for example processing, shipped, delivered, cancelled) so that status-change flows can be tested. After an order is placed, a test payment method produces a payment link or QR code. Nothing is actually charged.
+A developer starts the stack with a development override that exposes the ports of the shop and its database on the local machine, so the loader and later services can run and be debugged on the host.
 
-**Why this priority**: Needed for end-to-end tests of order tracking and payment flows, but works only once ordering exists.
+**Why this priority**: Required by the constitution and by everyday development, but the demo works without it.
 
-**Independent Test**: Place an order, open the administration area, change its status, and open the payment link to see a test payment page.
+**Independent Test**: Start the stack with the development override, connect to the shop and the database from the host, and run the loader from the host against the shop.
 
 **Acceptance Scenarios**:
 
-1. **Given** an order exists, **When** an administrator changes its status, **Then** the new status is saved and visible through the programmatic interface.
-2. **Given** an order is placed, **When** the test payment method is used, **Then** a payment link or QR code is available for that order.
-3. **Given** a test payment page, **When** a visitor completes it, **Then** no real money is charged and the order can be marked as paid.
+1. **Given** the development override, **When** the stack starts, **Then** the shop and its database are reachable on documented local ports.
+2. **Given** the default configuration without the override, **When** the stack starts, **Then** the database port is not exposed to the host.
+3. **Given** the development override, **When** the loader is run from the host, **Then** it loads the catalog into the running shop.
 
 ---
 
-### User Story 5 - Reset and re-seed to a clean state (Priority: P3)
+### User Story 5 - Integration tests with real containers (Priority: P2)
 
-A developer can reset the shop to a clean state (no products, no orders) and re-seed it, so tests start from a known baseline.
+A developer runs the automated test suite and it starts real OpenCart and database containers with Testcontainers, runs the loader against them and checks the result through the shop's API. No mocks stand in for the shop. The same tests run in the GitHub Actions check.
 
-**Why this priority**: Makes automated tests and demos repeatable; manual workarounds exist if missing.
+**Why this priority**: The loader's correctness depends on how the real shop behaves, so mocks would hide the failures that matter. It also keeps the tests an honest part of the blog series.
 
-**Independent Test**: Create orders and edit products, run the reset, verify the shop is empty, then run the loader and verify the baseline catalog.
+**Independent Test**: Run the test suite on a machine with Docker and see the tests start containers, load the sample catalog and pass.
 
 **Acceptance Scenarios**:
 
-1. **Given** a shop with orders and changes, **When** the reset is run, **Then** all products and orders are removed and the shop settings and service credentials remain usable.
-2. **Given** a reset shop, **When** the loader is run, **Then** the baseline catalog is restored.
+1. **Given** Docker is available, **When** the integration tests run, **Then** they start a fresh OpenCart and database from the same images and configuration as the demo, and remove them afterwards.
+2. **Given** a fresh shop container, **When** the tests run the loader with the sample catalog, **Then** they verify through the shop's API that the categories and products exist with the right prices and stock.
+3. **Given** a seeded test shop, **When** the tests run the loader a second time, **Then** they verify that no duplicates appear, and that a changed price is applied.
+4. **Given** a file with a malformed record, **When** the tests run the loader, **Then** they verify that the record is reported and the others are loaded.
+5. **Given** the test suite, **When** it runs, **Then** each test starts from a known state and does not depend on the order of other tests.
 
 ---
 
 ### Edge Cases
 
-- A product in the snapshot has no photo or no price; the loader skips or flags it and reports it.
-- The snapshot contains the same product twice; only one product is created.
-- Product names or attributes contain special characters, Cyrillic text or very long values; they are stored and displayed correctly.
-- The shop's programmatic interface is temporarily unavailable during seeding; the loader fails clearly and can be re-run safely.
-- An order is requested for a product that is out of stock; the programmatic interface reports it instead of silently creating the order.
-- Two orders are created at the same time; each gets a distinct identifier.
-- The service credentials are revoked; subsequent requests are rejected.
-- The setup is run on a machine whose required ports are already in use; the command reports the conflict clearly instead of failing midway.
-- The public address cannot be established (for example no internet access); the shop still starts locally, and the command says that no public address is available.
-- The public address changes after a restart; the new address is shown again and documented as the way to find it.
+- A product has no photo or no price; the loader skips and reports it.
+- The file contains the same product twice; only one product is created.
+- Names or attributes contain Cyrillic text, special characters or very long values; they are stored and displayed correctly.
+- The shop's programmatic interface is not ready yet when the loader starts; the loader waits and retries for a bounded time, then fails clearly, and can be re-run safely.
+- The JSON file is missing, not valid JSON, or in the wrong format; the loader fails with a clear message before changing anything.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: The shop MUST be reachable at a public address, obtained automatically by the setup, and present a Russian-language storefront with prices in rubles.
-- **FR-002**: The shop MUST present an electronics catalog with categories, brands, attributes, photos, prices and availability.
-- **FR-003**: A one-time snapshot of product data from a real electronics retailer MUST be stored as a file in a documented format containing name, category, brand, attributes, price, photo and availability for each product.
-- **FR-004**: The snapshot MUST be used for testing only and MUST NOT be redistributed for resale or competition.
-- **FR-005**: A separate loader MUST create categories, products, images, prices and stock in the shop from the snapshot.
-- **FR-006**: The loader MUST use only the shop connector, and the connector MUST use only the shop's official programmatic interface and MUST NOT access the shop's database directly.
-- **FR-007**: The loader MUST be idempotent: re-running it MUST NOT create duplicate categories or products and MUST apply changed values.
-- **FR-008**: The loader MUST report records it could not load and continue with the remaining records.
-- **FR-009**: The shop's programmatic interface MUST let an authorised external service read the catalog with all fields listed in FR-002.
-- **FR-010**: The shop's programmatic interface MUST let an authorised external service create an order with customer name, phone, delivery address, delivery method and items.
-- **FR-011**: The shop's programmatic interface MUST let an authorised external service read an order's current status and detect status changes.
-- **FR-012**: Requests without valid service credentials MUST be rejected without exposing or changing data.
-- **FR-013**: An administrator MUST be able to view orders and change their status through the shop's administration area.
-- **FR-014**: The shop MUST provide a test payment method that produces a payment link or QR code per order and never charges real money.
-- **FR-015**: The shop MUST be resettable to a clean state without redeploying it, and re-seedable afterwards.
-- **FR-016**: Setup and operation (deploying, seeding, resetting, obtaining service credentials) MUST be documented in English.
-- **FR-017**: The test server and the shop software on it MUST be provisioned and configured entirely from version-controlled code, so the whole environment can be rebuilt from the repository without manual steps on the server.
-- **FR-018**: The shop MUST be built on the OpenCart CMS, with no custom shop software.
-- **FR-019**: The whole environment (shop, database, loader, public address mechanism) MUST be started with one documented command and MUST run in containers.
-- **FR-020**: The setup MUST automate every step that can be automated, including installing OpenCart, configuring it, enabling the programmatic interface, creating service credentials and seeding the catalog; the remaining manual steps MUST be limited to installing documented prerequisites.
-- **FR-021**: The setup MUST obtain a public address without requiring the user to own a domain or configure DNS, certificates or router ports, and MUST print it at the end.
-- **FR-022**: The setup MUST be safe to re-run and MUST fail early with a clear message when prerequisites are missing or ports are taken.
-- **FR-023**: All operations on the shop by the loader and by external services (catalog read, order creation, order status read, status-change detection) MUST go through a shop connector with a shop-neutral contract; only the connector implementation MAY contain shop-specific code.
-- **FR-024**: The OpenCart connector MUST be the only component that knows about OpenCart's API, and the contract MUST be documented so that a connector for another shop can be written without changing its consumers.
-- **FR-025**: The environment MUST provide a development configuration that exposes the shop, its database and other external services on local ports, so the loader and the connector can be run and debugged outside containers against them.
+- **FR-001**: The shop MUST be OpenCart, with no custom shop software, and MUST present a Russian-language storefront with prices in rubles.
+- **FR-002**: The whole environment (shop, database and loader) MUST run in containers and start with `docker-compose up -d` as the single documented command.
+- **FR-003**: The setup MUST automate installing and configuring OpenCart, enabling its programmatic interface and seeding the catalog, with no manual steps beyond installing Docker.
+- **FR-004**: The setup MUST be safe to re-run without duplicating data or breaking an existing installation.
+- **FR-005**: The product file MUST be in a documented JSON format with categories and, for each product, name, category, brand, attributes, price, photo and availability.
+- **FR-006**: The loader MUST create and update categories, products, images, prices and stock in the shop from the JSON file.
+- **FR-007**: The loader MUST use only the shop's official programmatic interface and MUST NOT access the shop's database directly.
+- **FR-008**: The loader MUST be idempotent: re-running it MUST NOT create duplicate categories or products and MUST apply changed values.
+- **FR-009**: The loader MUST report records it could not load and continue with the remaining records, and MUST validate the file before changing anything.
+- **FR-010**: The repository MUST include a generated sample catalog in Russian that follows the documented format and is clearly marked as generated.
+- **FR-011**: A development override configuration MUST expose the shop and its database on local ports; the default configuration MUST NOT depend on it and MUST NOT expose the database.
+- **FR-012**: Credentials MUST come from configuration with documented non-secret defaults for local use, and no real secrets MUST be committed.
+- **FR-013**: Setup and operation (starting, loading data, the JSON format, the development override, ports) MUST be documented in English.
+- **FR-014**: The loader MUST have automated tests, and a GitHub Actions check MUST verify that the stack starts and the sample catalog loads.
+- **FR-015**: Integration tests MUST use Testcontainers to start real OpenCart and database containers, with no mocked shop, and MUST cover loading, idempotency, price updates and malformed records. They MUST clean up their containers and run both locally and in the GitHub Actions check.
 
 ### Key Entities
 
-- **Product Snapshot**: A file of source product records (name, category, brand, attributes, price, photo, availability) with its source and capture date.
+- **Product File**: A JSON file with categories and products in the documented format.
 - **Category**: A grouping of products in the shop's catalog.
-- **Product**: A catalog item with brand, attributes, photo, price in rubles and stock/availability.
-- **Order**: A purchase with customer details, items, delivery method, address, status and payment link or QR code.
-- **Order Status**: A stage of an order's life (for example new, processing, shipped, delivered, cancelled).
-- **Shop Connector**: The only component that talks to a specific shop. It implements a shop-neutral contract (read catalog, create order, read order status, detect status changes, upsert catalog items), and the OpenCart connector is its first implementation.
-- **Service Credential**: Authorisation given to an external service, such as the assistant, to use the programmatic interface.
-- **Administrator**: A shop user who manages orders and statuses.
+- **Product**: A catalog item with brand, attributes, photo, price in rubles and availability.
+- **Loader**: The tool that reads a product file and fills the shop through its programmatic interface.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: A visitor can open the public address and see a Russian-language product listing within 5 seconds.
-- **SC-002**: The seeded catalog contains at least 300 products across at least 8 categories and at least 15 brands, with at least 95% of products having a photo and a price.
-- **SC-003**: Seeding an empty shop completes in under 30 minutes, and a second run on the seeded shop creates 0 duplicates.
-- **SC-004**: Using only service credentials, a developer can list products, create an order and read its status in under 5 minutes of effort following the documentation.
-- **SC-005**: A status change made by an administrator is visible through the programmatic interface within 10 seconds.
-- **SC-006**: 100% of requests without valid credentials are rejected.
-- **SC-008**: A reader with only the documented prerequisites gets a running, seeded shop with a public address by running one command, with no other manual steps.
-- **SC-009**: Replacing the OpenCart connector with a connector for another shop requires no changes to the loader or to the consuming service.
-- **SC-010**: In the development configuration, the shop and database are reachable on local ports and the loader and connector run from a developer's machine against them.
-- **SC-007**: A full reset and re-seed returns the shop to the baseline in under 45 minutes with no manual steps beyond running documented commands.
+- **SC-001**: On a clean machine with Docker, `docker-compose up -d` results in a shop with the sample catalog visible in the browser, with no other manual steps.
+- **SC-002**: The storefront shows a Russian-language product listing within 5 seconds of opening the local address once the stack is up.
+- **SC-003**: The sample catalog has at least 20 products in at least 3 categories and 3 brands, and 100% of products have a photo and a price.
+- **SC-004**: A second loader run on the seeded shop creates 0 duplicates, and a changed price is applied.
+- **SC-005**: The full first start, including seeding, completes in under 10 minutes on a typical developer machine.
+- **SC-007**: The integration tests cover every acceptance scenario of User Story 2 against real containers, pass on a clean run in the GitHub Actions check, and leave no containers behind.
+- **SC-006**: With the development override, a developer can run the loader from the host against the running shop following the documentation.
 
 ## Assumptions
 
-- The shop is built on OpenCart, and the shop's own administration area is used for order management; no custom shop software is written.
-- The shop's official programmatic interface can cover catalog read, order creation and status read. If it cannot, how to close the gap without direct database access is a planning decision.
-- The one-command setup runs on a reader's own machine or on a server; the mechanism that provides the public address (for example a tunnelling service) is decided in planning. The address may be temporary.
-- The connector is deliberately more than this single example shop needs. It is included to demonstrate extensible design, since the assistant is not specific to any shop.
-- Everything runs in containers; a development configuration overrides the default one to expose ports of external services locally (see the constitution).
-- The catalog is electronics only, in Russian, with prices in rubles.
-- The product snapshot is collected once from a real electronics retailer's public catalog for testing only; scraping is a one-off step, not part of the running system.
-- Payments are stubbed: no payment provider is integrated and no real money moves.
-- Out of scope: real payments, real delivery integrations, production hardening, and the AI assistant itself (a later feature that will depend on this one).
+- The shop's official programmatic interface is enough to create categories, products, images, prices and stock. If it cannot, how to close the gap without direct database access is a planning decision.
+- Docker with the Compose plugin is the only prerequisite. `docker-compose up -d` is the documented command, and `docker compose up -d` is equivalent.
+- The loader runs as a container in the default configuration and can also run on the host in the development override. Its implementation language follows the constitution.
+- The constitution's shop connector rule (Principle II) is not fully implemented in this slice. The loader's OpenCart-specific code is kept isolated in one place so it can move into the connector in the next feature; the plan records this as a justified, temporary deviation.
+- Testcontainers is the library for integration tests, since the backend is .NET and it supports it. The tests reuse the demo's images and configuration so they test what readers actually run.
+- Placeholder photos are generated or taken from permissively licensed sources, and their origin is documented.
+- Out of scope: everything listed under "Deferred to later features".

@@ -426,3 +426,16 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Local shop configuration
+.env
+!.env.example
+
+# OpenCart source for editor intellisense (tools/fetch-opencart-source.sh)
+.opencart/
+
+# Extension package built by tools/package-extension.sh
+dist/
+
+# JetBrains Rider
+.idea/

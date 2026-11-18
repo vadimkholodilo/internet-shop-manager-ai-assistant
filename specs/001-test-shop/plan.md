@@ -1,0 +1,107 @@
+# Implementation Plan: Test Electronics Shop (Local Demo)
+
+**Branch**: `001-test-shop` | **Date**: 2026-11-03 | **Spec**: [spec.md](spec.md)
+
+**Input**: Feature specification from `/specs/001-test-shop/spec.md`
+
+## Summary
+
+Run OpenCart and its database in containers started by one `docker-compose up -d`, with a loader that
+fills the shop from a JSON file and a generated Russian sample catalog. OpenCart has no core API for
+creating catalog items (see [research.md](research.md)), so the gap is closed by a small in-repo OpenCart
+extension that exposes an authenticated catalog upsert endpoint using OpenCart's own models. The loader is
+a .NET 10 console app, published with Native AOT, that talks only to that endpoint over HTTP. Integration tests use Testcontainers with
+the same compose files and real containers.
+
+## Technical Context
+
+**Language/Version**: C# on .NET 10 (loader, tests); PHP (OpenCart extension, required by the platform)
+
+**Primary Dependencies**: OpenCart 4.x (built from a pinned release), MariaDB, Testcontainers for .NET, xUnit. The loader uses only AOT-compatible libraries: `System.Text.Json` with source generation, `HttpClient`, `System.CommandLine` for argument parsing (trim and AOT compatible), and hand-written product-file validation (no reflection-based libraries).
+
+**Storage**: MariaDB, owned by OpenCart; the loader never connects to it
+
+**Testing**: xUnit unit tests for parsing, validation and mapping; Testcontainers integration tests against
+real OpenCart and MariaDB containers
+
+**Target Platform**: Docker with the Compose plugin on a developer or reader machine, and GitHub Actions
+`ubuntu-latest`
+
+**Project Type**: CLI tool plus infrastructure definitions (compose, image build). The loader is published with Native AOT (`PublishAot`) and runs in a minimal runtime-deps image; test projects run on the normal runtime because xUnit and Testcontainers rely on reflection.
+
+**Performance Goals**: First start including seeding in under 10 minutes; storefront list page in under 5 seconds
+
+**Constraints**: Single command start, idempotent re-runs, no direct database access, no committed secrets
+
+**Scale/Scope**: About 3 categories and 20-40 generated products
+
+## Constitution Check
+
+*Gate before Phase 0; re-checked after Phase 1.*
+
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| I. .NET-first backend | Pass | Loader and tests in .NET 10, loader as a Native AOT binary. PHP only for the OpenCart extension, which runs inside OpenCart; no Python. |
+| II. Integrate, never replace | Pass with deviation | The loader and the tests use only the shop's API. The loader calls the extension endpoint directly instead of a connector, and shop provisioning configures the new shop with SQL; see Complexity Tracking. |
+| III. Grounded and safe assistant | N/A | No assistant behaviour in this slice. |
+| IV. Human in the loop | N/A | Not touched. |
+| V. Test-first | Pass | Unit and Testcontainers integration tests, run in the `tests` workflow. |
+| VI. Language policy | Pass | English docs and code; the sample catalog content is Russian. |
+| VII. Incremental simplicity | Pass | Public address, connector, orders and reset deferred. |
+| VIII. Infrastructure as code | Pass | Everything defined in compose files and Dockerfiles; no manual steps. |
+| IX. Containers with dev overrides | Pass | `docker-compose.yml` (shop on localhost) plus `docker-compose.dev.yml` also exposing the database on localhost. |
+
+Post-design re-check: unchanged; the only deviation is the one below.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/001-test-shop/
+├── plan.md
+├── research.md
+├── data-model.md
+├── quickstart.md
+├── contracts/
+│   ├── product-file.schema.json
+│   └── catalog-endpoint.md
+└── tasks.md             # created by /speckit-tasks
+```
+
+### Source Code (repository root)
+
+```text
+docker-compose.yml            # db, shop, loader (default; the database port is not published)
+docker-compose.dev.yml        # dev override: also publishes the database port
+.env.example                  # non-secret local defaults
+shop/
+├── Dockerfile                # OpenCart 4.1.0.4 on php:8.2-apache, plus our extension and Russian strings
+├── entrypoint.sh             # unattended install, idempotent
+├── provision.sh              # Russian, rubles, demo catalog removal
+├── apache/opencart.conf      # /catalog-api rewrite, Authorization header, SHOP_API_KEY
+├── php/opencart.ini
+└── extension/ai_assistant/     # OpenCart extension (install.json, admin module, catalog controller)
+    └── catalog/controller/api.php   # authenticated catalog REST endpoint
+data/
+├── sample-catalog.json       # generated Russian sample catalog
+├── README.md                 # file format
+└── images/                   # generated placeholder photos
+src/ShopLoader/               # .NET 10 Native AOT console loader (+ Dockerfile)
+tests/ShopLoader.UnitTests/
+tests/ShopLoader.IntegrationTests/   # Testcontainers, real OpenCart and MariaDB
+tools/generate-sample/generate.cs    # generates the sample catalog and photos
+tools/smoke-test.sh           # runs the real `docker compose up -d` demo and checks it
+```
+
+**Structure Decision**: One .NET solution at the root with the loader and two test projects. Shop
+infrastructure lives under `shop/`, so the loader's OpenCart-specific HTTP code sits in one class
+(`OpenCartCatalogClient`) that can move into the connector in the next feature.
+
+## Complexity Tracking
+
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| Loader calls the OpenCart extension directly, not via a connector (Principle II) | The connector is deferred to the next feature to keep this slice small | Building the connector now would add the contract design to a slice meant to prove only the one-command demo. The OpenCart-specific code is isolated in one class so it moves into the connector later. |
+| Custom PHP extension inside OpenCart | OpenCart core has no catalog write API | A third-party API extension is unverified and may be paid; driving the admin UI with form posts is fragile; direct database writes are forbidden. |
+| `shop/provision.sh` sets up the new demo shop (language, currency, store details, removal of OpenCart's demo content, registration of the extension) with SQL (Principle II: no database access) | OpenCart has no API for settings, languages or currencies, and its CLI installer cannot install Russian. This is provisioning of the shop itself, run once when the shop is created; nothing that integrates with the shop (the loader, the tests, later the assistant) touches the database. Store details are written once, so later edits in the admin area are kept. | Clicking through the admin area by hand breaks Principle VIII (no manual steps); a script that drives the admin UI is fragile and needs the same credentials. |

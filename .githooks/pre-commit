@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Runs before every commit, whoever or whatever makes it:
+#   1. formats the staged C# files with `dotnet format` and stages the result, so CI's format check passes;
+#   2. runs tools/check-changed.sh on the staged files (build, PHP syntax, Docker lint), the same checks Claude runs.
+# Enable once per clone: git config core.hooksPath .githooks      Skip in an emergency: git commit --no-verify
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+staged() { git diff --cached --name-only --diff-filter=ACMR "$@"; }
+
+cs_files=()
+while IFS= read -r file; do
+    cs_files+=("$file")
+done < <(staged -- '*.cs')
+
+if [ "${#cs_files[@]}" -gt 0 ]; then
+    # Staging the formatted file would also stage edits that are not meant for this commit.
+    partial=$(git diff --name-only -- "${cs_files[@]}")
+    if [ -n "$partial" ]; then
+        echo "pre-commit: these files have unstaged changes, stage or stash them first so formatting can be applied:" >&2
+        echo "$partial" >&2
+        exit 1
+    fi
+
+    dotnet format InternetShop.slnx --include "${cs_files[@]}"
+    git add -- "${cs_files[@]}"
+fi
+
+staged | tools/check-changed.sh

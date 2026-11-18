@@ -22,4 +22,4 @@ Spec Kit, one feature per directory in `specs/`, one feature at a time. Currentl
 the AI assistant feature is added after it.
 
 Every feature is merged through a pull request with a short description; the `tests` GitHub Actions check
-must pass first (`.github/workflows/tests.yml`).
+must pass first (`.github/workflows/pull-request.yml`).

@@ -1,0 +1,8 @@
+# Accepted Dockerfile findings (trivy config). Each entry says why it is fine here.
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - shop/Dockerfile
+    statement: Apache must start as root to bind port 80 and the entrypoint provisions the shop; php:apache drops its workers to www-data.
+  - id: DS-0026
+    statement: Health checks are defined per service in docker-compose.yml, and the loader is a one-shot container.
