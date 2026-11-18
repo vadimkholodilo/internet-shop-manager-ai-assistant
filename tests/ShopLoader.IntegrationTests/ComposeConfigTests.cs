@@ -6,25 +6,12 @@ namespace ShopLoader.IntegrationTests;
 /// <summary>User Story 4: the development override publishes the ports, the default configuration does not publish the database.</summary>
 public sealed class ComposeConfigTests
 {
-    private static string Root
-    {
-        get
-        {
-            var directory = new DirectoryInfo(AppContext.BaseDirectory);
-            while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "InternetShop.slnx")))
-            {
-                directory = directory.Parent;
-            }
-            return directory!.FullName;
-        }
-    }
-
     private static JsonNode Config(params string[] files)
     {
         var arguments = string.Join(' ', files.Select(f => $"-f {f}")) + " config --format json";
         var start = new ProcessStartInfo("docker", "compose " + arguments)
         {
-            WorkingDirectory = Root,
+            WorkingDirectory = Repository.Root,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
         };
@@ -39,8 +26,11 @@ public sealed class ComposeConfigTests
         return JsonNode.Parse(output)!;
     }
 
+    private static IEnumerable<JsonNode> Ports(JsonNode config, string service) =>
+        config["services"]![service]!["ports"]?.AsArray().Select(p => p!) ?? [];
+
     private static IEnumerable<string> PublishedPorts(JsonNode config, string service) =>
-        config["services"]![service]!["ports"]?.AsArray().Select(p => p!["published"]!.GetValue<string>()) ?? [];
+        Ports(config, service).Select(p => p["published"]!.GetValue<string>());
 
     [Fact]
     public void DefaultConfigurationPublishesTheShopButNotTheDatabase()
@@ -58,6 +48,17 @@ public sealed class ComposeConfigTests
 
         Assert.Equal(["18080"], PublishedPorts(config, "shop"));
         Assert.Equal(["13306"], PublishedPorts(config, "db"));
+    }
+
+    [Fact]
+    public void PublishedPortsAreReachableFromThisMachineOnly()
+    {
+        // The demo ships default credentials, so it must not be offered to the network.
+        var config = Config("docker-compose.yml", "docker-compose.dev.yml");
+
+        var ports = new[] { "shop", "db" }.SelectMany(service => Ports(config, service)).ToList();
+        Assert.NotEmpty(ports);
+        Assert.All(ports, port => Assert.Equal("127.0.0.1", port["host_ip"]!.GetValue<string>()));
     }
 
     [Fact]

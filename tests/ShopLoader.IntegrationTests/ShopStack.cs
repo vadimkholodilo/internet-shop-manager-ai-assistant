@@ -30,7 +30,7 @@ public sealed class ShopStack : IAsyncLifetime
 
     public HttpClient Http { get; private set; } = null!;
 
-    public string RepositoryRoot { get; } = FindRepositoryRoot();
+    public string RepositoryRoot => Repository.Root;
 
     public async Task InitializeAsync()
     {
@@ -115,16 +115,6 @@ public sealed class ShopStack : IAsyncLifetime
         if (shop is not null) { await shop.DisposeAsync(); }
         if (db is not null) { await db.DisposeAsync(); }
         if (network is not null) { await network.DisposeAsync(); }
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "InternetShop.slnx")))
-        {
-            directory = directory.Parent;
-        }
-        return directory?.FullName ?? throw new InvalidOperationException("Repository root not found");
     }
 }
 

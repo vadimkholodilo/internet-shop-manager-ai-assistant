@@ -14,6 +14,13 @@ class Api extends \Opencart\System\Engine\Controller {
     private const ATTRIBUTE_GROUP = 'Характеристики';
     private const PAGE_SIZE = 50;
 
+    /** Product columns this API does not manage; an update keeps whatever a manager set in the admin area. */
+    private const UNMANAGED_PRODUCT_FIELDS = [
+        'sku', 'upc', 'ean', 'jan', 'isbn', 'mpn', 'location', 'minimum', 'subtract', 'stock_status_id',
+        'date_available', 'shipping', 'points', 'weight', 'weight_class_id', 'length', 'width', 'height',
+        'length_class_id', 'status', 'tax_class_id', 'sort_order',
+    ];
+
     private int $language_id = 0;
 
     public function index(): void {
@@ -152,9 +159,9 @@ class Api extends \Opencart\System\Engine\Controller {
         $model = $this->admin('catalog/category');
         $existing = $this->findCategoryBySlug($slug);
         $description = [
-            'name' => $name,
+            'name' => $this->encode($name),
             'description' => '',
-            'meta_title' => $name,
+            'meta_title' => $this->encode($name),
             'meta_description' => '',
             'meta_keyword' => '',
         ];
@@ -182,7 +189,7 @@ class Api extends \Opencart\System\Engine\Controller {
                 'status' => (int)$current['status'],
                 'top' => (int)($current['top'] ?? 0),
                 'column' => (int)($current['column'] ?? 1),
-                'category_description' => [$this->language_id => $description + ['name' => $name]],
+                'category_description' => [$this->language_id => $description],
                 'category_store' => [0],
                 'category_seo_url' => [0 => [$this->language_id => $slug]],
             ]);
@@ -252,7 +259,7 @@ class Api extends \Opencart\System\Engine\Controller {
         return [
             'id' => $id,
             'slug' => $this->slugOfCategory($id),
-            'name' => $descriptions[$this->language_id]['name'] ?? '',
+            'name' => $this->decode($descriptions[$this->language_id]['name'] ?? ''),
             'parent_id' => $parent_id ?: null,
             'parent_slug' => $parent_id ? $this->slugOfCategory($parent_id) : null,
         ];
@@ -289,6 +296,7 @@ class Api extends \Opencart\System\Engine\Controller {
         $product_attributes = $this->ensureAttributes($attributes);
 
         $existing = $this->findProductBySku($sku);
+        $this->assertKeywordIsFree($sku, $existing === null ? null : (int)$existing['product_id']);
 
         $data = [
             'model' => $sku,
@@ -322,11 +330,11 @@ class Api extends \Opencart\System\Engine\Controller {
             'sort_order' => 0,
             'image' => '',
             'product_description' => [$this->language_id => [
-                'name' => $name,
-                'description' => nl2br(htmlspecialchars($description, ENT_QUOTES, 'UTF-8')),
+                'name' => $this->encode($name),
+                'description' => $this->encodeDescription($description),
                 'tag' => '',
-                'meta_title' => $name,
-                'meta_description' => mb_substr($description, 0, 160),
+                'meta_title' => $this->encode($name),
+                'meta_description' => $this->encode(mb_substr($description, 0, 160)),
                 'meta_keyword' => '',
             ]],
             'product_category' => [(int)$category['category_id']],
@@ -340,7 +348,10 @@ class Api extends \Opencart\System\Engine\Controller {
             $created = true;
         } else {
             $product_id = (int)$existing['product_id'];
-            // Keep what this API does not manage: the photo and additional images.
+            // Keep what this API does not manage: the photos and the settings a manager may have changed.
+            foreach (self::UNMANAGED_PRODUCT_FIELDS as $field) {
+                $data[$field] = $existing[$field] ?? $data[$field];
+            }
             $data['image'] = (string)$existing['image'];
             $data['product_image'] = $model->getImages($product_id);
             $model->editProduct($product_id, $data);
@@ -427,8 +438,24 @@ class Api extends \Opencart\System\Engine\Controller {
         return $row ? $row : throw new ApiError(404, 'Product not found');
     }
 
+    /** URL keyword (and image file name) for a SKU. */
     private function productKeyword(string $sku): string {
-        return trim((string)preg_replace('/[^a-z0-9]+/', '-', strtolower($sku)), '-');
+        return $this->keyword($sku, 'product');
+    }
+
+    private function keyword(string $text, string $fallbackPrefix): string {
+        $keyword = trim((string)preg_replace('/[^a-z0-9]+/', '-', strtolower($text)), '-');
+
+        return $keyword !== '' ? $keyword : $fallbackPrefix . '-' . substr(md5($text), 0, 8);
+    }
+
+    /** Different SKUs can map to the same keyword (AB_1 and AB-1); they would share a URL and a photo. */
+    private function assertKeywordIsFree(string $sku, ?int $own_product_id): void {
+        $row = $this->db->query("SELECT `value` FROM `" . DB_PREFIX . "seo_url` WHERE `key` = 'product_id' AND `store_id` = '0' AND `language_id` = '" . $this->language_id . "' AND `keyword` = '" . $this->db->escape($this->productKeyword($sku)) . "' LIMIT 1")->row;
+
+        if ($row && (int)$row['value'] !== $own_product_id) {
+            throw new ApiError(409, 'SKU ' . $sku . ' maps to the same URL keyword as another product');
+        }
     }
 
     private function productRepresentation(array $product): array {
@@ -441,24 +468,24 @@ class Api extends \Opencart\System\Engine\Controller {
         $brand = '';
         if ((int)$product['manufacturer_id']) {
             $manufacturer = $this->admin('catalog/manufacturer')->getManufacturer((int)$product['manufacturer_id']);
-            $brand = (string)($manufacturer['name'] ?? '');
+            $brand = $this->decode((string)($manufacturer['name'] ?? ''));
         }
 
         $attributes = [];
         foreach ($model->getAttributes($id) as $attribute) {
             $info = $this->admin('catalog/attribute')->getDescription((int)$attribute['attribute_id'], $this->language_id);
             $text = $attribute['product_attribute_description'][$this->language_id]['text'] ?? '';
-            $attributes[(string)($info['name'] ?? $attribute['attribute_id'])] = $text;
+            $attributes[$this->decode((string)($info['name'] ?? $attribute['attribute_id']))] = $this->decode($text);
         }
 
         return [
             'id' => $id,
             'sku' => (string)$product['model'],
-            'name' => $descriptions[$this->language_id]['name'] ?? '',
+            'name' => $this->decode($descriptions[$this->language_id]['name'] ?? ''),
             'category_id' => $category_id,
             'category_slug' => $category_id ? $this->slugOfCategory($category_id) : null,
             'brand' => $brand,
-            'description' => trim(html_entity_decode(strip_tags((string)($descriptions[$this->language_id]['description'] ?? '')), ENT_QUOTES, 'UTF-8')),
+            'description' => $this->decodeDescription((string)($descriptions[$this->language_id]['description'] ?? '')),
             'attributes' => (object)$attributes,
             'price' => (float)$product['price'],
             'quantity' => (int)$product['quantity'],
@@ -468,7 +495,8 @@ class Api extends \Opencart\System\Engine\Controller {
 
     // ---------------------------------------------------- brands and attributes
 
-    private function ensureManufacturer(string $name): int {
+    private function ensureManufacturer(string $brand): int {
+        $name = $this->encode($brand);
         $row = $this->db->query("SELECT `manufacturer_id` FROM `" . DB_PREFIX . "manufacturer` WHERE `name` = '" . $this->db->escape($name) . "' LIMIT 1")->row;
         if ($row) {
             return (int)$row['manufacturer_id'];
@@ -479,7 +507,7 @@ class Api extends \Opencart\System\Engine\Controller {
             'image' => '',
             'sort_order' => 0,
             'manufacturer_store' => [0],
-            'manufacturer_seo_url' => [0 => [$this->language_id => $this->productKeyword($name) ?: 'brand-' . substr(md5($name), 0, 8)]],
+            'manufacturer_seo_url' => [0 => [$this->language_id => $this->keyword($brand, 'brand')]],
         ]);
     }
 
@@ -501,10 +529,10 @@ class Api extends \Opencart\System\Engine\Controller {
         $group_id = null;
 
         foreach ($attributes as $attribute_name => $value) {
-            $attribute_name = (string)$attribute_name;
-            if ($attribute_name === '' || !is_scalar($value)) {
+            if ((string)$attribute_name === '' || !is_scalar($value)) {
                 throw new ApiError(400, 'attributes must map names to text values');
             }
+            $attribute_name = $this->encode((string)$attribute_name);
 
             $row = $this->db->query("SELECT `a`.`attribute_id` FROM `" . DB_PREFIX . "attribute` `a` LEFT JOIN `" . DB_PREFIX . "attribute_description` `ad` ON (`a`.`attribute_id` = `ad`.`attribute_id`) WHERE `ad`.`name` = '" . $this->db->escape($attribute_name) . "' AND `ad`.`language_id` = '" . $this->language_id . "' LIMIT 1")->row;
 
@@ -521,7 +549,7 @@ class Api extends \Opencart\System\Engine\Controller {
 
             $result[] = [
                 'attribute_id' => $attribute_id,
-                'product_attribute_description' => [$this->language_id => ['text' => (string)$value]],
+                'product_attribute_description' => [$this->language_id => ['text' => $this->encode((string)$value)]],
             ];
         }
 
@@ -529,6 +557,28 @@ class Api extends \Opencart\System\Engine\Controller {
     }
 
     // ----------------------------------------------------------------- helpers
+
+    /** OpenCart prints stored text as HTML (its own forms store it encoded), so text from the API is encoded on write... */
+    private function encode(string $text): string {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+
+    /** ...and decoded on read, so the API returns exactly what was sent. */
+    private function decode(string $text): string {
+        return html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * The storefront decodes a description once and prints it as HTML (it is rich text in OpenCart), so plain text
+     * becomes escaped HTML with line breaks first and is then encoded like every other stored text.
+     */
+    private function encodeDescription(string $text): string {
+        return $this->encode(nl2br($this->encode($text)));
+    }
+
+    private function decodeDescription(string $stored): string {
+        return trim($this->decode(strip_tags($this->decode($stored))));
+    }
 
     private function assertSlug(string $slug): void {
         if (!preg_match('/^[a-z0-9-]+$/', $slug)) {

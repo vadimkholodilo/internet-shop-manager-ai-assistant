@@ -114,13 +114,54 @@ public sealed class CatalogApiTests(ShopStack shop)
         Assert.Equal(HttpStatusCode.NotFound, await shop.Http.StatusAsync("catalog-api/products/BAD-1"));
     }
 
-    [Fact]
-    public async Task ImageUploadRejectsUnsupportedTypesAndUnknownProducts()
+    private async Task<string> CreateCategoryAsync()
     {
-        using var content = new ByteArrayContent([1, 2, 3]);
-        content.Headers.ContentType = new MediaTypeHeaderValue("text/plain");
-        using var unknown = await shop.Http.PutAsync("catalog-api/products/NO-SUCH-SKU/image", content);
+        var slug = Slug();
+        await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{slug}", new { name = "Для проверок" });
+        return slug;
+    }
 
-        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+    private static object ProductBody(string category) =>
+        new { name = "Товар", category, brand = "Бренд", description = "Описание", price = 100, quantity = 1 };
+
+    private async Task<string> CreateProductAsync()
+    {
+        var sku = "T-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+        var (status, body) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/products/{sku}", ProductBody(await CreateCategoryAsync()));
+        Assert.True(status == HttpStatusCode.OK, body?.ToJsonString());
+        return sku;
+    }
+
+    private async Task<HttpStatusCode> PutImageAsync(string sku, string contentType, byte[] bytes)
+    {
+        using var content = new ByteArrayContent(bytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        using var response = await shop.Http.PutAsync($"catalog-api/products/{sku}/image", content);
+        return response.StatusCode;
+    }
+
+    [Fact]
+    public async Task ImageUploadRejectsUnsupportedTypesBadImagesAndUnknownProducts()
+    {
+        var sku = await CreateProductAsync();
+
+        Assert.Equal(HttpStatusCode.NotFound, await PutImageAsync("NO-SUCH-SKU", "image/png", [1, 2, 3]));
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, await PutImageAsync(sku, "text/plain", [1, 2, 3]));
+        Assert.Equal(HttpStatusCode.BadRequest, await PutImageAsync(sku, "image/png", [1, 2, 3]));
+    }
+
+    [Fact]
+    public async Task SkusThatMapToTheSameUrlKeywordAreRejected()
+    {
+        // AB_1 and AB-1 are different SKUs but would share a URL keyword and a photo file name.
+        var suffix = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        var category = await CreateCategoryAsync();
+        var (first, _) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/products/KW_{suffix}", ProductBody(category));
+
+        var (second, _) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/products/KW-{suffix}", ProductBody(category));
+
+        Assert.Equal(HttpStatusCode.OK, first);
+        Assert.Equal(HttpStatusCode.Conflict, second);
+        Assert.Equal(HttpStatusCode.NotFound, await shop.Http.StatusAsync($"catalog-api/products/KW-{suffix}"));
     }
 }

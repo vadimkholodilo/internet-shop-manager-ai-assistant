@@ -30,7 +30,7 @@ services:
       SHOP_ADMIN_EMAIL: ${SHOP_ADMIN_EMAIL:-admin@example.com}
       SHOP_API_KEY: ${SHOP_API_KEY:-local-demo-api-key-change-me}
     ports:
-      - "${SHOP_PORT:-8080}:80"
+      - "127.0.0.1:${SHOP_PORT:-8080}:80"
     volumes:
       - shop-state:/state
       - shop-images:/var/www/html/image/catalog

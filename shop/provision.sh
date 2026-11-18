@@ -16,8 +16,6 @@ UPDATE oc_currency SET title = 'Российский рубль', symbol_left = 
 UPDATE oc_setting SET value = 'ru-ru' WHERE `key` IN ('config_language_catalog', 'config_language_admin');
 UPDATE oc_setting SET value = 'RUB' WHERE `key` = 'config_currency';
 UPDATE oc_setting SET value = '0' WHERE `key` = 'config_error_display';
-UPDATE oc_setting SET value = 'Электроника' WHERE `key` = 'config_name';
-UPDATE oc_setting SET value = '{"1":{"meta_title":"Электроника - тестовый магазин","meta_description":"Тестовый магазин электроники для демонстрации ИИ-ассистента","meta_keyword":""}}' WHERE `key` = 'config_description' AND store_id = 0;
 UPDATE oc_stock_status SET name = 'В наличии' WHERE name = 'In Stock';
 UPDATE oc_stock_status SET name = 'Нет в наличии' WHERE name = 'Out Of Stock';
 UPDATE oc_stock_status SET name = 'Предзаказ' WHERE name = 'Pre-Order';
@@ -35,8 +33,12 @@ UPDATE oc_user_group SET permission = JSON_ARRAY_APPEND(permission, '$.modify', 
   WHERE user_group_id = 1 AND NOT JSON_CONTAINS(JSON_EXTRACT(permission, '$.modify'), '"extension/ai_assistant/module/catalog_api"');
 SQL
 
-echo "[shop] removing demo banners and setting Russian store details"
-sql <<'SQL'
+# Store details are set once, so what a manager changes in the admin area survives restarts.
+if [ ! -f "$STATE/store-details-set" ]; then
+    echo "[shop] removing demo banners and setting Russian store details"
+    sql <<'SQL'
+UPDATE oc_setting SET value = 'Электроника' WHERE `key` = 'config_name';
+UPDATE oc_setting SET value = '{"1":{"meta_title":"Электроника - тестовый магазин","meta_description":"Тестовый магазин электроники для демонстрации ИИ-ассистента","meta_keyword":""}}' WHERE `key` = 'config_description' AND store_id = 0;
 DELETE FROM oc_layout_module WHERE code LIKE 'opencart.banner.%';
 DELETE FROM oc_module WHERE code = 'opencart.banner';
 DELETE FROM oc_banner_image;
@@ -53,6 +55,8 @@ UPDATE oc_information_description SET title = 'Политика конфиден
 UPDATE oc_information_description SET title = 'Доставка', meta_title = 'Доставка',
   description = '<p>Доставка по России курьером или в пункты выдачи, сроки и стоимость зависят от региона.</p>' WHERE information_id = 4;
 SQL
+    touch "$STATE/store-details-set"
+fi
 
 # OpenCart ships with an English demo catalog. Remove it once, so the shop contains only loaded data.
 if [ ! -f "$STATE/demo-catalog-removed" ]; then
