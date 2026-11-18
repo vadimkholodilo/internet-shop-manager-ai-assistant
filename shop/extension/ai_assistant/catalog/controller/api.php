@@ -80,8 +80,7 @@ class Api extends \Opencart\System\Engine\Controller {
 
     /** Name of the lock for the item a write is about, or null when the request is not a write to an item. */
     private function writeLockName(): ?string {
-        $parts = array_values(array_filter(explode('/', trim((string)($this->request->get['api_path'] ?? ''), '/')), 'strlen'));
-        $parts = array_map('rawurldecode', $parts);
+        $parts = $this->pathParts();
         $resource = $parts[0] ?? '';
         $key = $parts[1] ?? null;
         if ($key === null) {
@@ -98,6 +97,12 @@ class Api extends \Opencart\System\Engine\Controller {
         return null;
     }
 
+    /** The decoded segments of the requested path: resource, key, optional sub-resource. */
+    private function pathParts(): array {
+        $parts = array_values(array_filter(explode('/', trim((string)($this->request->get['api_path'] ?? ''), '/')), 'strlen'));
+        return array_map('rawurldecode', $parts);
+    }
+
     private function acquireLock(string $name): void {
         $row = $this->db->query("SELECT GET_LOCK('" . $this->db->escape($name) . "', 10) AS `locked`")->row;
         if ((int)($row['locked'] ?? 0) !== 1) {
@@ -110,8 +115,7 @@ class Api extends \Opencart\System\Engine\Controller {
 
     private function dispatch(): void {
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $parts = array_values(array_filter(explode('/', trim((string)($this->request->get['api_path'] ?? ''), '/')), 'strlen'));
-        $parts = array_map('rawurldecode', $parts);
+        $parts = $this->pathParts();
 
         $resource = $parts[0] ?? '';
         $key = $parts[1] ?? null;

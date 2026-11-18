@@ -78,11 +78,7 @@ internal static class HttpRetry
         status is HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests
             or HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout;
 
-    /// <summary>
-    /// Statuses worth repeating: those of <see cref="IsShopUnavailable"/>; 500, which is also how a passing error in the
-    /// shop looks even though it may be permanent for one record; and 423, which the OpenCart catalog API answers while
-    /// another request is writing the same item. Those two stay a failure of the record once the retries are used up.
-    /// </summary>
+    /// <summary>The unavailable statuses plus 500 and 423 (the item is busy), which stay a failure of the record once the retries are used up.</summary>
     public static bool IsTemporary(HttpStatusCode status) =>
         IsShopUnavailable(status) || status is HttpStatusCode.InternalServerError or HttpStatusCode.Locked;
 

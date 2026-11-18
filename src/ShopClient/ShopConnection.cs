@@ -5,9 +5,6 @@ namespace ShopClient;
 /// <summary>How to reach a shop's API. Invalid values are rejected when the connection is built, not on the first request.</summary>
 public sealed record ShopConnection
 {
-    private readonly TimeSpan requestTimeout = TimeSpan.FromSeconds(60);
-    private readonly int maxRetries = 3;
-    private readonly TimeSpan retryDelay = TimeSpan.FromMilliseconds(500);
 
     /// <param name="url">Absolute http or https address of the shop.</param>
     /// <param name="apiKey">Credential for the shop's API; never logged.</param>
@@ -46,13 +43,13 @@ public sealed record ShopConnection
     /// <exception cref="ArgumentOutOfRangeException">The value is zero or negative.</exception>
     public TimeSpan RequestTimeout
     {
-        get => requestTimeout;
+        get;
         init
         {
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, TimeSpan.Zero);
-            requestTimeout = value;
+            field = value;
         }
-    }
+    } = TimeSpan.FromSeconds(60);
 
     /// <summary>
     /// How many times a request that failed in a temporary way (lost connection, timeout, 408, 423, 429, 500, 502, 503, 504) is
@@ -61,30 +58,30 @@ public sealed record ShopConnection
     /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
     public int MaxRetries
     {
-        get => maxRetries;
+        get;
         init
         {
             ArgumentOutOfRangeException.ThrowIfNegative(value);
-            maxRetries = value;
+            field = value;
         }
-    }
+    } = 3;
 
     /// <summary>The wait before the first retry; it doubles for each further retry (with jitter) up to 10 seconds.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The value is negative.</exception>
     public TimeSpan RetryDelay
     {
-        get => retryDelay;
+        get;
         init
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(value, TimeSpan.Zero);
-            retryDelay = value;
+            field = value;
         }
-    }
+    } = TimeSpan.FromMilliseconds(500);
 
     // The generated ToString would print every property, including the key.
     private bool PrintMembers(StringBuilder builder)
     {
-        builder.Append($"Url = {Url}, ApiKey = ***, RequestTimeout = {RequestTimeout}");
+        builder.Append($"Url = {Url}, ApiKey = ***, RequestTimeout = {RequestTimeout}, MaxRetries = {MaxRetries}, RetryDelay = {RetryDelay}");
         return true;
     }
 }

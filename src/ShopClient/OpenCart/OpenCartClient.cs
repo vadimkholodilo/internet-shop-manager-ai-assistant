@@ -14,6 +14,8 @@ namespace ShopClient.OpenCart;
 /// </summary>
 internal sealed class OpenCartClient : ICatalogLoadingClient
 {
+    private static readonly TimeSpan PauseBetweenReadinessChecks = TimeSpan.FromSeconds(3);
+
     private readonly HttpClient http;
     private readonly ShopConnection connection;
 
@@ -30,6 +32,8 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", connection.ApiKey);
     }
 
+    // Readiness has its own loop, not HttpRetry: it is bounded by a deadline, not by a number of attempts, and it also
+    // waits through the whole start-up of a shop (any answer other than 401 means "not yet").
     public async Task WaitUntilReadyAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(timeout, TimeSpan.Zero);
@@ -49,7 +53,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
 
             // One attempt never outlives the overall timeout, even when the shop accepts the connection and then hangs.
             using var attempt = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            attempt.CancelAfter(remaining > TimeSpan.Zero && remaining < connection.RequestTimeout ? remaining : connection.RequestTimeout);
+            attempt.CancelAfter(remaining > TimeSpan.Zero ? TimeSpan.FromTicks(Math.Min(remaining.Ticks, connection.RequestTimeout.Ticks)) : connection.RequestTimeout);
             try
             {
                 using var response = await http.GetAsync("catalog-api/categories", attempt.Token);
@@ -59,8 +63,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
                 }
                 if (response.StatusCode == HttpStatusCode.Unauthorized)
                 {
-                    throw new ShopUnavailableException(
-                        "The shop rejected the API key (401).", response.StatusCode);
+                    throw RejectedKey(response);
                 }
                 lastProblem = $"HTTP {(int)response.StatusCode}";
             }
@@ -73,9 +76,8 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
                 lastProblem = "request timed out";
             }
 
-            var pause = TimeSpan.FromSeconds(3);
             var left = timeout - clock.Elapsed;
-            await Task.Delay(left < pause ? (left > TimeSpan.Zero ? left : TimeSpan.Zero) : pause, cancellationToken);
+            await Task.Delay(TimeSpan.FromTicks(Math.Clamp(left.Ticks, 0, PauseBetweenReadinessChecks.Ticks)), cancellationToken);
         }
     }
 
@@ -165,7 +167,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
         }
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
-            throw new ShopUnavailableException("The shop rejected the API key (401).", response.StatusCode);
+            throw RejectedKey(response);
         }
         if (HttpRetry.IsShopUnavailable(response.StatusCode))
         {
@@ -190,6 +192,9 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
 
         throw new CatalogException(message + HttpRetry.Attempts(attempts), response.StatusCode);
     }
+
+    private static ShopUnavailableException RejectedKey(HttpResponseMessage response) =>
+        new("The shop rejected the API key (401).", response.StatusCode);
 
     private static string Truncate(string text) => text.Length <= 500 ? text : text[..500] + "…";
 
