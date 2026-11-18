@@ -17,7 +17,7 @@ public sealed class OpenCartClientTests
         // The operating system completes the connection for a listening socket, but nothing ever answers the request.
         using var silent = new TcpListener(IPAddress.Loopback, 0);
         silent.Start();
-        using var client = new OpenCartClient(new ShopConnection(UrlOf(silent), "key", TimeSpan.FromMilliseconds(300)));
+        using var client = new OpenCartClient(new ShopConnection(UrlOf(silent), "key") { RequestTimeout = TimeSpan.FromMilliseconds(300) });
 
         var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
 

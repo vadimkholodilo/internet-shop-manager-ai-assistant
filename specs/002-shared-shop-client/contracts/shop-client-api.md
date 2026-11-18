@@ -33,7 +33,10 @@ public readonly record struct ShopType
     public static bool TryParse(string? name, out ShopType type);   // case-insensitive
 }
 
-public sealed record ShopConnection(Uri Url, string ApiKey, TimeSpan? RequestTimeout = null);
+public sealed record ShopConnection(Uri Url, string ApiKey)
+{
+    public TimeSpan RequestTimeout { get; init; } = TimeSpan.FromSeconds(60);   // overridable per connection
+}
 public sealed record UpsertResult(long Id, bool Created);
 public sealed record CatalogCategory(string Slug, string Name, string? Parent);
 public sealed record CatalogProduct(string Sku, string Name, string Category, string Brand, string Description,

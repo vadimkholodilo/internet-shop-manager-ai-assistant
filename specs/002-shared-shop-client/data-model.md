@@ -46,7 +46,7 @@ the list of supported names. `default(ShopType)` has no name and is invalid: the
 |-------|------|-------|
 | Url | Uri | Address of the shop |
 | ApiKey | string | Credential for the shop's API; never logged |
-| RequestTimeout | TimeSpan? | One request's limit; default 60 seconds |
+| RequestTimeout | TimeSpan | One request's limit; defaults to 60 seconds on the connection itself and can be overridden |
 
 ## Failures
 

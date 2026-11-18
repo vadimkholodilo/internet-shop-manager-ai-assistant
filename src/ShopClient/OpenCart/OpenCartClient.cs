@@ -16,7 +16,7 @@ internal sealed class OpenCartClient : ICatalogLoadingClient
 
     public OpenCartClient(ShopConnection connection)
     {
-        requestTimeout = connection.RequestTimeout ?? TimeSpan.FromSeconds(60);
+        requestTimeout = connection.RequestTimeout;
         http = new HttpClient
         {
             BaseAddress = new Uri(connection.Url.ToString().TrimEnd('/') + "/"),
