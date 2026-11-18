@@ -2,27 +2,8 @@ using ShopLoader.Validation;
 
 namespace ShopLoader.UnitTests;
 
-public sealed class ProductFileValidatorTests : IDisposable
+public sealed class ProductFileValidatorTests : UnitTest
 {
-    private readonly TestDirectory directory = new();
-
-    public void Dispose() => directory.Dispose();
-
-    private static string Product(
-        string sku = "A-1", string price = "100", string quantity = "1", string category = "phones",
-        string image = "a.png", string extra = "") =>
-        $$"""
-        {"sku":"{{sku}}","name":"Смартфон","category":"{{category}}","brand":"Acme","description":"Описание",
-         "attributes":{"Память":"128 ГБ"},"price":{{price}},"quantity":{{quantity}},"image":"{{image}}"{{extra}}}
-        """;
-
-    private ValidationResult Validate(string products, string categories = """[{"slug":"phones","name":"Телефоны"}]""")
-    {
-        directory.AddImage("a.png");
-        var file = directory.WriteCatalog($$"""{"categories":{{categories}},"products":[{{products}}]}""");
-        return ProductFileValidator.ValidateFile(file, directory.Images);
-    }
-
     [Fact]
     public void ValidFileProducesNoErrors()
     {
@@ -38,15 +19,15 @@ public sealed class ProductFileValidatorTests : IDisposable
     [Fact]
     public void MissingFileFailsBeforeAnyChange()
     {
-        var e = Assert.Throws<ProductFileException>(() => ProductFileValidator.ValidateFile(Path.Combine(directory.Path, "none.json"), directory.Images));
+        var e = Assert.Throws<ProductFileException>(() => ProductFileValidator.ValidateFile(Path.Combine(Workspace.Path, "none.json"), Workspace.Images));
         Assert.Contains("not found", e.Message);
     }
 
     [Fact]
     public void InvalidJsonFailsBeforeAnyChange()
     {
-        var file = directory.WriteCatalog("{ not json");
-        var e = Assert.Throws<ProductFileException>(() => ProductFileValidator.ValidateFile(file, directory.Images));
+        var file = WriteRawCatalog("{ not json");
+        var e = Assert.Throws<ProductFileException>(() => ProductFileValidator.ValidateFile(file, Workspace.Images));
         Assert.Contains("not valid JSON", e.Message);
     }
 
@@ -57,8 +38,8 @@ public sealed class ProductFileValidatorTests : IDisposable
     [InlineData("""{"categories":[],"products":[],"colour":"red"}""")]
     public void WrongFormatFailsBeforeAnyChange(string json)
     {
-        var file = directory.WriteCatalog(json);
-        Assert.Throws<ProductFileException>(() => ProductFileValidator.ValidateFile(file, directory.Images));
+        var file = WriteRawCatalog(json);
+        Assert.Throws<ProductFileException>(() => ProductFileValidator.ValidateFile(file, Workspace.Images));
     }
 
     [Theory]
@@ -103,7 +84,7 @@ public sealed class ProductFileValidatorTests : IDisposable
     [Fact]
     public void ImagePathCannotEscapeTheImagesDirectory()
     {
-        File.WriteAllBytes(Path.Combine(directory.Path, "secret.png"), [1]);
+        File.WriteAllBytes(Path.Combine(Workspace.Path, "secret.png"), [1]);
         var result = Validate(Product(image: "../secret.png"));
 
         Assert.Empty(result.File.Products);
@@ -113,7 +94,7 @@ public sealed class ProductFileValidatorTests : IDisposable
     [Fact]
     public void ImagePathCannotEscapeToASiblingDirectoryWithTheSamePrefix()
     {
-        var sibling = directory.Images + "-private";
+        var sibling = Workspace.Images + "-private";
         Directory.CreateDirectory(sibling);
         File.WriteAllBytes(Path.Combine(sibling, "x.png"), [1]);
 

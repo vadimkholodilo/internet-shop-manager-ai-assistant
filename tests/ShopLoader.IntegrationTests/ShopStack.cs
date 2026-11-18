@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Images;
@@ -28,7 +27,10 @@ public sealed class ShopStack : IAsyncLifetime
 
     public Uri ShopUrl { get; private set; } = null!;
 
-    public HttpClient Http { get; private set; } = null!;
+    /// <summary>The catalog API with the test shop's key.</summary>
+    public CatalogApi Api { get; private set; } = null!;
+
+    public Storefront Storefront { get; private set; } = null!;
 
     public string RepositoryRoot => Repository.Root;
 
@@ -77,8 +79,8 @@ public sealed class ShopStack : IAsyncLifetime
         await shop.StartAsync();
 
         ShopUrl = new Uri($"http://{shop.Hostname}:{shop.GetMappedPublicPort(80)}/");
-        Http = new HttpClient { BaseAddress = ShopUrl, Timeout = TimeSpan.FromSeconds(60) };
-        Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
+        Api = new CatalogApi(ShopUrl, ApiKey);
+        Storefront = new Storefront(ShopUrl);
 
         await WaitForStorefrontAsync();
     }
@@ -90,15 +92,12 @@ public sealed class ShopStack : IAsyncLifetime
         {
             try
             {
-                using var response = await Http.GetAsync("index.php?route=common/home");
-                if (response.IsSuccessStatusCode)
-                {
-                    return;
-                }
+                await Storefront.HomePageAsync();
+                return;
             }
             catch (HttpRequestException)
             {
-                // Not accepting connections yet.
+                // Not accepting connections yet, or still starting.
             }
 
             if (DateTime.UtcNow > deadline)
@@ -111,7 +110,8 @@ public sealed class ShopStack : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        Http?.Dispose();
+        Api?.Dispose();
+        Storefront?.Dispose();
         if (shop is not null) { await shop.DisposeAsync(); }
         if (db is not null) { await db.DisposeAsync(); }
         if (network is not null) { await network.DisposeAsync(); }

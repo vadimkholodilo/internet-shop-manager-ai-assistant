@@ -71,7 +71,7 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d   # shop :8
 The loader is a Native AOT .NET 10 program; `dotnet run` works with the .NET 10 SDK, and the Docker build
 produces the AOT binary. Tests: `dotnet test` runs unit tests and integration tests, which start real OpenCart
 and MariaDB containers with Testcontainers (Docker required, the first run builds the images).
-`tools/smoke-test.sh` runs the real `docker compose up -d` demo and checks the result.
+`tools/smoke-test.sh` runs the real `docker compose up -d` demo and checks the result. How the tests are organised, and how to write one, is in [`tests/README.md`](tests/README.md).
 
 **Quality checks.** The same checks run wherever code changes, so quality does not depend on who edits:
 

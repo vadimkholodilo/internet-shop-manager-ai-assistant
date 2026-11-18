@@ -1,72 +1,46 @@
-using DotNet.Testcontainers.Builders;
-using DotNet.Testcontainers.Containers;
-
 namespace ShopLoader.IntegrationTests;
 
 /// <summary>
 /// User Stories 1 and 3: the Native AOT loader image loads the generated sample catalog into the real shop,
 /// the shop shows it in Russian, and a second run changes nothing.
 /// </summary>
-[Collection("shop")]
-public sealed class SampleDemoTests(ShopStack shop)
+public sealed class SampleDemoTests(ShopStack shop) : ShopTest(shop)
 {
-    private async Task<(long ExitCode, string Logs)> RunLoaderContainerAsync()
-    {
-        await using var loader = new ContainerBuilder(shop.LoaderImage)
-            .WithNetwork(shop.Network)
-            .WithEnvironment("SHOP_API_KEY", ShopStack.ApiKey)
-            .WithCommand("--file", "/data/sample-catalog.json", "--images-dir", "/data/images", "--url", "http://shop")
-            .Build();
-
-        await loader.StartAsync();
-
-        for (var i = 0; i < 100 && loader.State != TestcontainersStates.Exited; i++)
-        {
-            await Task.Delay(100);
-        }
-
-        var (stdout, stderr) = await loader.GetLogsAsync();
-        return (await loader.GetExitCodeAsync(), stdout + stderr);
-    }
-
     [Fact]
     public async Task SampleCatalogLoadsWithTheNativeAotLoaderAndAReRunCreatesNothingNew()
     {
-        var first = await RunLoaderContainerAsync();
+        var first = await RunSampleLoaderContainerAsync();
 
         Assert.Equal(0, first.ExitCode);
-        Assert.Contains("Failed records: 0", first.Logs);
-        var products = await shop.Http.ProductCountAsync();
+        Assert.Contains("Failed records: 0", first.Output);
+        var products = await Api.ProductCountAsync();
         Assert.True(products >= 20, $"expected at least 20 products, found {products}");
 
-        var second = await RunLoaderContainerAsync();
+        var second = await RunSampleLoaderContainerAsync();
 
         Assert.Equal(0, second.ExitCode);
-        Assert.Contains("Products: 0 created", second.Logs);
-        Assert.Equal(products, await shop.Http.ProductCountAsync());
+        Assert.Contains("Products: 0 created", second.Output);
+        Assert.Equal(products, await Api.ProductCountAsync());
     }
 
     [Fact]
     public async Task StorefrontShowsTheSampleCatalogInRussianWithRubles()
     {
-        await RunLoaderContainerAsync();
-        using var storefront = new HttpClient { BaseAddress = shop.ShopUrl };
+        await RunSampleLoaderContainerAsync();
 
-        var home = await storefront.GetStringAsync("index.php?route=common/home");
+        var home = await Storefront.HomePageAsync();
         Assert.Contains("lang=\"ru\"", home);
         Assert.Contains("Электроника", home);
 
-        var phones = (await shop.Http.GetJsonAsync("catalog-api/categories/smartphones"))!;
-        var parent = phones["parent_id"]!.GetValue<int>();
-        var page = await storefront.GetStringAsync($"index.php?route=product/category&language=ru-ru&path={parent}_{phones["id"]}");
+        var phones = await Api.GetCategoryAsync("smartphones");
+        var category = await Storefront.CategoryPageAsync(phones.ParentId!.Value, phones.Id);
 
-        Assert.Contains("Смартфон Norda Pulse 5 128 ГБ", page);
-        Assert.Contains("24 990 ₽", page);
-        Assert.Contains("Сортировать по", page);
-        Assert.Contains("/image/cache/catalog/products/ph-001", page);
+        Assert.Contains("Смартфон Norda Pulse 5 128 ГБ", category);
+        Assert.Contains("24 990 ₽", category);
+        Assert.Contains("Сортировать по", category);
+        Assert.Contains("/image/cache/catalog/products/ph-001", category);
 
-        var product = (await shop.Http.ProductAsync("PH-001"))!;
-        var details = await storefront.GetStringAsync($"index.php?route=product/product&language=ru-ru&product_id={product["id"]}");
+        var details = await Storefront.ProductPageAsync((await Api.GetProductAsync("PH-001")).Id);
         Assert.Contains("Бренд:", details);
         Assert.Contains("Norda", details);
         Assert.Contains("Диагональ экрана", details);

@@ -1,38 +1,27 @@
 namespace ShopLoader.UnitTests;
 
-public sealed class CliTests : IDisposable
+public sealed class CliTests : UnitTest
 {
-    private readonly TestDirectory directory = new();
-
-    public void Dispose() => directory.Dispose();
-
-    private static async Task<(int Exit, string Error)> Run(params string[] args)
-    {
-        var error = new StringWriter();
-        var exit = await Cli.RunAsync(args, new StringWriter(), error);
-        return (exit, error.ToString());
-    }
-
     [Fact]
     public async Task NoArgumentsReportsWhatIsMissing()
     {
-        var (exit, error) = await Run();
+        var run = await RunCliAsync();
 
-        Assert.Equal(2, exit);
-        Assert.Contains("--file", error);
-        Assert.Contains("--url", error);
-        Assert.Contains("--help", error);
+        Assert.Equal(2, run.Exit);
+        Assert.Contains("--file", run.Error);
+        Assert.Contains("--url", run.Error);
+        Assert.Contains("--help", run.Error);
     }
 
     [Theory]
-    [InlineData("--file", "x.json", "--url", "not-a-url", "--api-key", "k")]
-    [InlineData("--file", "x.json", "--url", "ftp://shop", "--api-key", "k")]
-    public async Task UrlMustBeHttp(params string[] args)
+    [InlineData("not-a-url")]
+    [InlineData("ftp://shop")]
+    public async Task UrlMustBeHttp(string url)
     {
-        var (exit, error) = await Run(args);
+        var run = await RunCliAsync("--file", "x.json", "--url", url, "--api-key", "k");
 
-        Assert.Equal(2, exit);
-        Assert.Contains("--url", error);
+        Assert.Equal(2, run.Exit);
+        Assert.Contains("--url", run.Error);
     }
 
     [Fact]
@@ -42,10 +31,10 @@ public sealed class CliTests : IDisposable
         Environment.SetEnvironmentVariable("SHOP_API_KEY", null);
         try
         {
-            var (exit, error) = await Run("--file", "x.json", "--url", "http://shop");
+            var run = await RunCliAsync("--file", "x.json", "--url", "http://shop");
 
-            Assert.Equal(2, exit);
-            Assert.Contains("SHOP_API_KEY", error);
+            Assert.Equal(2, run.Exit);
+            Assert.Contains("SHOP_API_KEY", run.Error);
         }
         finally
         {
@@ -56,33 +45,28 @@ public sealed class CliTests : IDisposable
     [Fact]
     public async Task MissingFileFailsBeforeContactingTheShop()
     {
-        var (exit, error) = await Run("--file", Path.Combine(directory.Path, "none.json"), "--url", "http://127.0.0.1:9", "--api-key", "k", "--wait-seconds", "0");
+        var run = await LoadWithoutAShopAsync(Path.Combine(Workspace.Path, "none.json"));
 
-        Assert.Equal(2, exit);
-        Assert.Contains("not found", error);
+        Assert.Equal(2, run.Exit);
+        Assert.Contains("not found", run.Error);
     }
 
     [Fact]
     public async Task InvalidJsonFailsBeforeContactingTheShop()
     {
-        var file = directory.WriteCatalog("{ nope");
+        var run = await LoadWithoutAShopAsync(WriteRawCatalog("{ nope"));
 
-        var (exit, error) = await Run("--file", file, "--url", "http://127.0.0.1:9", "--api-key", "k", "--wait-seconds", "0");
-
-        Assert.Equal(2, exit);
-        Assert.Contains("not valid JSON", error);
+        Assert.Equal(2, run.Exit);
+        Assert.Contains("not valid JSON", run.Error);
     }
 
     [Fact]
     public async Task UnreachableShopFailsClearly()
     {
-        directory.AddImage("a.png");
-        var file = directory.WriteCatalog("""{"categories":[{"slug":"c","name":"К"}],"products":[]}""");
+        var run = await LoadWithoutAShopAsync(WriteCatalog());
 
-        var (exit, error) = await Run("--file", file, "--url", "http://127.0.0.1:9", "--api-key", "k", "--wait-seconds", "0");
-
-        Assert.Equal(2, exit);
-        Assert.Contains("did not become ready", error);
+        Assert.Equal(2, run.Exit);
+        Assert.Contains("did not become ready", run.Error);
     }
 
     [Theory]
@@ -90,9 +74,9 @@ public sealed class CliTests : IDisposable
     [InlineData("-1")]
     public async Task WaitSecondsMustBeANonNegativeNumber(string value)
     {
-        var (exit, error) = await Run("--file", "x.json", "--url", "http://shop", "--api-key", "k", "--wait-seconds", value);
+        var run = await RunCliAsync("--file", "x.json", "--url", "http://shop", "--api-key", "k", "--wait-seconds", value);
 
-        Assert.Equal(2, exit);
-        Assert.Contains("--wait-seconds", error);
+        Assert.Equal(2, run.Exit);
+        Assert.Contains("--wait-seconds", run.Error);
     }
 }

@@ -1,153 +1,87 @@
 using System.Net;
-using System.Net.Http.Headers;
-using System.Text.Json.Nodes;
 
 namespace ShopLoader.IntegrationTests;
 
 /// <summary>The catalog API extension: authentication, ids in responses, validation and keyed upserts.</summary>
-[Collection("shop")]
-public sealed class CatalogApiTests(ShopStack shop)
+public sealed class CatalogApiTests(ShopStack shop) : ShopTest(shop)
 {
-    private static string Slug() => "api-" + Guid.NewGuid().ToString("N")[..8];
-
-    private HttpClient WithoutKey()
-    {
-        var http = new HttpClient { BaseAddress = shop.ShopUrl };
-        return http;
-    }
-
     [Theory]
     [InlineData("")]
     [InlineData("wrong-key")]
     public async Task RequestsWithoutAValidKeyAreRejectedAndChangeNothing(string key)
     {
-        using var http = WithoutKey();
-        if (key != "")
-        {
-            http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
-        }
-        var slug = Slug();
-        var before = await shop.Http.CategoryCountAsync();
+        using var unauthorized = Api.WithKey(key);
+        var slug = NewSlug();
+        var before = await Api.CategoryCountAsync();
 
-        Assert.Equal(HttpStatusCode.Unauthorized, await http.StatusAsync("catalog-api/products"));
-        Assert.Equal(HttpStatusCode.Unauthorized, await http.StatusAsync("catalog-api/categories"));
-        var (status, _) = await http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{slug}", new { name = "Не должна появиться" });
+        Assert.Equal(HttpStatusCode.Unauthorized, (await unauthorized.TryListProductsAsync()).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await unauthorized.TryListCategoriesAsync()).Status);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await unauthorized.TryUpsertCategoryAsync(slug, "Не должна появиться")).Status);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, status);
-        Assert.Equal(before, await shop.Http.CategoryCountAsync());
-        Assert.Equal(HttpStatusCode.NotFound, await shop.Http.StatusAsync($"catalog-api/categories/{slug}"));
+        Assert.Equal(before, await Api.CategoryCountAsync());
+        Assert.Equal(HttpStatusCode.NotFound, (await Api.TryGetCategoryAsync(slug)).Status);
     }
 
     [Fact]
     public async Task CategoryResponsesCarryIdsAndKeys()
     {
-        var parent = Slug();
-        var child = Slug();
+        var parent = await Api.UpsertCategoryAsync(NewSlug(), "Родитель");
+        var child = await Api.UpsertCategoryAsync(NewSlug(), "Ребёнок", parent.Slug);
 
-        var (_, parentBody) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{parent}", new { name = "Родитель" });
-        var (status, childBody) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{child}", new { name = "Ребёнок", parent });
-
-        Assert.Equal(HttpStatusCode.OK, status);
-        Assert.True(parentBody!["created"]!.GetValue<bool>());
-        Assert.Equal(parentBody["id"]!.GetValue<int>(), childBody!["parent_id"]!.GetValue<int>());
-        Assert.Equal(parent, childBody["parent_slug"]!.GetValue<string>());
-        Assert.Equal(child, childBody["slug"]!.GetValue<string>());
-
-        var byId = (await shop.Http.GetJsonAsync($"catalog-api/categories/by-id/{childBody["id"]}"))!;
-        var bySlug = (await shop.Http.GetJsonAsync($"catalog-api/categories/{child}"))!;
-        Assert.Equal(byId.ToJsonString(), bySlug.ToJsonString());
+        Assert.True(parent.Created);
+        Assert.Equal(parent.Id, child.ParentId);
+        Assert.Equal(parent.Slug, child.ParentSlug);
+        Assert.Equal(await Api.GetCategoryByIdAsync(child.Id), await Api.GetCategoryAsync(child.Slug));
     }
 
     [Fact]
     public async Task UpsertKeepsTheSameIdAndUpdatesValues()
     {
-        var slug = Slug();
-        var (_, first) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{slug}", new { name = "Было" });
-        var (_, second) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{slug}", new { name = "Стало" });
+        var slug = NewSlug();
+        var first = await Api.UpsertCategoryAsync(slug, "Было");
+        var second = await Api.UpsertCategoryAsync(slug, "Стало");
 
-        Assert.True(first!["created"]!.GetValue<bool>());
-        Assert.False(second!["created"]!.GetValue<bool>());
-        Assert.Equal(first["id"]!.GetValue<int>(), second["id"]!.GetValue<int>());
-        Assert.Equal("Стало", second["name"]!.GetValue<string>());
+        Assert.True(first.Created);
+        Assert.False(second.Created);
+        Assert.Equal(first.Id, second.Id);
+        Assert.Equal("Стало", second.Name);
     }
 
     [Fact]
     public async Task ProductResponsesCarryIdsAndAreListed()
     {
-        using var catalog = new TestCatalog(shop.RepositoryRoot).AddProduct(1);
-        catalog.Write();
-        await Cli.RunAsync(["--file", catalog.File, "--images-dir", catalog.Images, "--url", shop.ShopUrl.ToString(), "--api-key", ShopStack.ApiKey],
-            new StringWriter(), new StringWriter());
+        var category = await NewCategoryAsync();
+        var product = await Api.UpsertProductAsync(NewSku(), new ProductSpec(category.Slug));
 
-        var product = (await shop.Http.ProductAsync(catalog.Sku(1)))!;
-        var category = (await shop.Http.GetJsonAsync($"catalog-api/categories/{catalog.CategorySlug}"))!;
+        Assert.Equal(category.Id, product.CategoryId);
+        Assert.Equal(product.Sku, (await Api.GetProductByIdAsync(product.Id)).Sku);
 
-        Assert.Equal(category["id"]!.GetValue<int>(), product["category_id"]!.GetValue<int>());
-        var byId = (await shop.Http.GetJsonAsync($"catalog-api/products/by-id/{product["id"]}"))!;
-        Assert.Equal(catalog.Sku(1), byId["sku"]!.GetValue<string>());
-
-        var list = (await shop.Http.GetJsonAsync("catalog-api/products"))!;
-        Assert.True(list["total"]!.GetValue<int>() >= 1);
-        Assert.All(list["items"]!.AsArray(), item => Assert.True(item!["id"]!.GetValue<int>() > 0));
+        var list = await Api.ListProductsAsync();
+        Assert.True(list.Total >= 1);
+        Assert.All(list.Items, item => Assert.True(item.Id > 0));
     }
 
     [Fact]
     public async Task InvalidRequestsAreRejectedWithClearStatusCodes()
     {
-        var category = Slug();
-        await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{category}", new { name = "Для проверок" });
-        object Product(object? price = null, int quantity = 1, string? cat = null) => new
-        {
-            name = "Товар",
-            category = cat ?? category,
-            brand = "Бренд",
-            description = "Описание",
-            price = price ?? 100,
-            quantity,
-        };
+        var category = await NewCategoryAsync();
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await shop.Http.SendJsonAsync(HttpMethod.Put, "catalog-api/products/BAD-1", Product(price: 0))).Status);
-        Assert.Equal(HttpStatusCode.BadRequest, (await shop.Http.SendJsonAsync(HttpMethod.Put, "catalog-api/products/BAD-2", Product(quantity: -1))).Status);
-        Assert.Equal(HttpStatusCode.NotFound, (await shop.Http.SendJsonAsync(HttpMethod.Put, "catalog-api/products/BAD-3", Product(cat: "no-such-category"))).Status);
-        Assert.Equal(HttpStatusCode.NotFound, (await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{Slug()}", new { name = "X", parent = "no-such-parent" })).Status);
-        Assert.Equal(HttpStatusCode.BadRequest, (await shop.Http.SendJsonAsync(HttpMethod.Put, "catalog-api/categories/Bad_Slug", new { name = "X" })).Status);
-        Assert.Equal(HttpStatusCode.NotFound, await shop.Http.StatusAsync("catalog-api/products/BAD-1"));
-    }
-
-    private async Task<string> CreateCategoryAsync()
-    {
-        var slug = Slug();
-        await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/categories/{slug}", new { name = "Для проверок" });
-        return slug;
-    }
-
-    private static object ProductBody(string category) =>
-        new { name = "Товар", category, brand = "Бренд", description = "Описание", price = 100, quantity = 1 };
-
-    private async Task<string> CreateProductAsync()
-    {
-        var sku = "T-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
-        var (status, body) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/products/{sku}", ProductBody(await CreateCategoryAsync()));
-        Assert.True(status == HttpStatusCode.OK, body?.ToJsonString());
-        return sku;
-    }
-
-    private async Task<HttpStatusCode> PutImageAsync(string sku, string contentType, byte[] bytes)
-    {
-        using var content = new ByteArrayContent(bytes);
-        content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-        using var response = await shop.Http.PutAsync($"catalog-api/products/{sku}/image", content);
-        return response.StatusCode;
+        Assert.Equal(HttpStatusCode.BadRequest, (await Api.TryUpsertProductAsync("BAD-1", new ProductSpec(category.Slug, Price: 0))).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Api.TryUpsertProductAsync("BAD-2", new ProductSpec(category.Slug, Quantity: -1))).Status);
+        Assert.Equal(HttpStatusCode.NotFound, (await Api.TryUpsertProductAsync("BAD-3", new ProductSpec("no-such-category"))).Status);
+        Assert.Equal(HttpStatusCode.NotFound, (await Api.TryUpsertCategoryAsync(NewSlug(), "X", parent: "no-such-parent")).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Api.TryUpsertCategoryAsync("Bad_Slug", "X")).Status);
+        Assert.Equal(HttpStatusCode.NotFound, (await Api.TryGetProductAsync("BAD-1")).Status);
     }
 
     [Fact]
     public async Task ImageUploadRejectsUnsupportedTypesBadImagesAndUnknownProducts()
     {
-        var sku = await CreateProductAsync();
+        var product = await NewProductAsync();
 
-        Assert.Equal(HttpStatusCode.NotFound, await PutImageAsync("NO-SUCH-SKU", "image/png", [1, 2, 3]));
-        Assert.Equal(HttpStatusCode.UnsupportedMediaType, await PutImageAsync(sku, "text/plain", [1, 2, 3]));
-        Assert.Equal(HttpStatusCode.BadRequest, await PutImageAsync(sku, "image/png", [1, 2, 3]));
+        Assert.Equal(HttpStatusCode.NotFound, await Api.UploadImageAsync("NO-SUCH-SKU", "image/png", [1, 2, 3]));
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, await Api.UploadImageAsync(product.Sku, "text/plain", [1, 2, 3]));
+        Assert.Equal(HttpStatusCode.BadRequest, await Api.UploadImageAsync(product.Sku, "image/png", [1, 2, 3]));
     }
 
     [Fact]
@@ -155,13 +89,13 @@ public sealed class CatalogApiTests(ShopStack shop)
     {
         // AB_1 and AB-1 are different SKUs but would share a URL keyword and a photo file name.
         var suffix = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
-        var category = await CreateCategoryAsync();
-        var (first, _) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/products/KW_{suffix}", ProductBody(category));
+        var spec = new ProductSpec((await NewCategoryAsync()).Slug);
 
-        var (second, _) = await shop.Http.SendJsonAsync(HttpMethod.Put, $"catalog-api/products/KW-{suffix}", ProductBody(category));
+        var first = await Api.TryUpsertProductAsync($"KW_{suffix}", spec);
+        var second = await Api.TryUpsertProductAsync($"KW-{suffix}", spec);
 
-        Assert.Equal(HttpStatusCode.OK, first);
-        Assert.Equal(HttpStatusCode.Conflict, second);
-        Assert.Equal(HttpStatusCode.NotFound, await shop.Http.StatusAsync($"catalog-api/products/KW-{suffix}"));
+        Assert.Equal(HttpStatusCode.OK, first.Status);
+        Assert.Equal(HttpStatusCode.Conflict, second.Status);
+        Assert.Equal(HttpStatusCode.NotFound, (await Api.TryGetProductAsync($"KW-{suffix}")).Status);
     }
 }
