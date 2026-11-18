@@ -64,7 +64,7 @@ does not need to write `CancellationToken.None`.
 - Upserts are idempotent: the same key updates, never duplicates; `Created` tells which happened.
 - A rejected single record, an unreadable image file or a non-JSON answer raises `CatalogException`; a lost connection, timeout, `401` or `502/503/504` raises `ShopUnavailableException`. Both carry the HTTP status when there was an answer and the original exception as `InnerException`.
 - A bad argument (null, blank key fields, negative price or quantity, non-positive timeout) raises the `ArgumentException` family before any request is made.
-- Temporary failures (lost connection, attempt timeout, 408/429/500/502/503/504) are retried up to `MaxRetries` times with exponential backoff and jitter; the final failure is the one that would have been thrown without retries, naming the attempts. Rejections of the record, `401` and cancellation are never retried.
+- Temporary failures (lost connection, attempt timeout, 408/429/500/502/503/504) are retried up to `MaxRetries` times with exponential backoff and jitter; the final failure is the one that would have been thrown without retries, naming the attempts. Rejections of the record, `401`, unknown hosts, TLS failures and cancellation are never retried.
 - The OpenCart catalog API serializes writes per item key, so a repeated write never creates a second item.
 - `WaitUntilReadyAsync(timeout)` tries at least once and does not run past `timeout` because of a slow attempt.
 - The library never opens a database connection and holds no static shop state, so several clients for different shops can coexist.

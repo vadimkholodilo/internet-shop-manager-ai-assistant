@@ -203,6 +203,39 @@ public sealed class OpenCartClientTests
     }
 
     [Fact(Timeout = 15_000)]
+    public async Task ATlsFailureIsNotRetried()
+    {
+        // A port that speaks plain text where TLS is expected. An unknown host takes the same path (both are
+        // HttpRequestError values the helper does not retry) but cannot be reproduced reliably: some networks answer every name.
+        using var plain = new TcpListener(IPAddress.Loopback, 0);
+        plain.Start();
+        var accepted = 0;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (true)
+                {
+                    using var connection = await plain.AcceptTcpClientAsync();
+                    Interlocked.Increment(ref accepted);
+                    await connection.GetStream().WriteAsync("HTTP/1.1 400 not tls\r\n\r\n"u8.ToArray());
+                }
+            }
+            catch (Exception e) when (e is ObjectDisposedException or SocketException or IOException)
+            {
+                // The test is over.
+            }
+        });
+        var url = new Uri($"https://127.0.0.1:{((IPEndPoint)plain.LocalEndpoint).Port}");
+        using var client = new OpenCartClient(new ShopConnection(url, "key") { RetryDelay = TimeSpan.FromSeconds(30) });
+
+        var error = await Assert.ThrowsAsync<ShopUnavailableException>(() => client.UpsertCategoryAsync(Category));
+
+        Assert.DoesNotContain("attempts", error.Message);
+        Assert.Equal(1, accepted);
+    }
+
+    [Fact(Timeout = 15_000)]
     public async Task ARejectedApiKeyIsNotRetried()
     {
         using var shop = new ScriptedShop(Status(401));

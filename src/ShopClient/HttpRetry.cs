@@ -33,6 +33,11 @@ internal static class HttpRetry
                     return (response, attempt);
                 }
             }
+            catch (HttpRequestException e) when (e.HttpRequestError is HttpRequestError.NameResolutionError or HttpRequestError.SecureConnectionError)
+            {
+                // An unknown host or a bad certificate does not fix itself between attempts; stop at once.
+                throw new ShopUnavailableException($"Cannot reach the shop: {e.Message}", e.StatusCode, e);
+            }
             catch (HttpRequestException e)
             {
                 (failure, failureStatus, failureCause) = ($"Lost connection to the shop: {e.Message}", e.StatusCode, e);
