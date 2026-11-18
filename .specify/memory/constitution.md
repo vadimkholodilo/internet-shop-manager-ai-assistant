@@ -58,7 +58,33 @@ LLM non-determinism, such as repeated runs and assertions on invariants instead 
 Each safety rule in Principle III MUST have at least one automated test. Tests SHOULD be written
 before the implementation they cover.
 
-Rationale: manual testing cannot cover all scenarios, and model output varies between runs.
+Tests MUST be designed to be useful and cheap to maintain:
+- Every test MUST protect behaviour that matters. A test written only to have a test, one that
+  repeats another test, or one that exercises a library instead of this project's code MUST NOT
+  be written. Before writing a test, decide which kind proves the most.
+- Logic that needs no shop (validation, parsing, formatting, error mapping) MUST be tested with
+  unit tests: fast, precise, and without containers.
+- Behaviour that involves the shop (the shop's API contract, storefront output, what the loader
+  does to a shop) MUST be tested with integration tests against the real shop and its database,
+  started with Testcontainers, because they prove more than a unit test can.
+- Tests MUST NOT use mocks, fakes, or stubs that stand in for the shop. A scenario that cannot
+  be reproduced against the real shop MUST either be made reproducible or be left untested on
+  purpose, never covered by a stand-in.
+- A scenario MUST be covered once, at the level that proves more; it MUST NOT be repeated across
+  unit and integration tests.
+- Operations that several tests share MUST live in a base class: `UnitTest` for unit tests and
+  `ShopTest` for integration tests, each in its test project's `Support` folder. A helper that
+  more than one test could use MUST be placed there, not copied into a test class.
+- Contract details (URL paths, request bodies, response field names, file formats) MUST appear
+  only in those helpers, never in test classes, so that a contract change touches the helper and
+  not every test.
+
+`tests/README.md` shows where a test belongs and how to write one.
+
+Rationale: manual testing cannot cover all scenarios, and model output varies between runs. Tests
+earn their place by catching real regressions at the lowest cost: a stand-in for the shop only
+proves that the stand-in matches the code, and shared helpers keep tests short and contract
+changes cheap.
 
 ### VI. Language Policy
 
@@ -131,4 +157,4 @@ added principles or materially expanded guidance, PATCH for clarifications and w
 reviews MUST verify compliance with the principles, with Principle III checked on every change
 that touches assistant behaviour.
 
-**Version**: 1.4.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-03
+**Version**: 1.5.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-18
