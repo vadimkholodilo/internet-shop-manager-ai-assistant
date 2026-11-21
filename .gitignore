@@ -439,3 +439,7 @@ dist/
 
 # JetBrains Rider
 .idea/
+
+# Output and cache of tools/build-catalog
+/out/
+/.cache/
