@@ -6,14 +6,14 @@
 
 **Status**: Draft
 
-**Input**: User description: "Real demo catalog from the Wildberries dataset. Replace the generated sample catalog (data/sample-catalog.json and data/images/, produced by tools/generate-sample) with a realistic Russian electronics catalog built from the Hugging Face dump nyuuzyou/wb-products (CC0) as the index and Wildberries' public static card.json files and photos for details. Product file format from spec 001 stays unchanged and is loaded by the existing loader with no changes. All findings and decisions are in catalog-dataset-notes.md at the repository root: follow it. Keep the spec short."
+**Input**: User description: "Real demo catalog from the Wildberries dataset. Replace the generated sample catalog (data/sample-catalog.json and data/images/, produced by tools/generate-sample) with a realistic Russian electronics catalog built from the Hugging Face dump nyuuzyou/wb-products (CC0) as the index and Wildberries' public static card.json files and photos for details. Product file format from spec 001 stays unchanged and is loaded by the existing loader with no changes. All findings and decisions are in specs/003-real-demo-catalog/source-notes.md: follow it. Keep the spec short."
 
 ## Scope
 
 The demo shop is seeded with about 30 invented products. The AI assistant needs a realistic catalog to search,
 compare and recommend from: real Russian product names, brands, descriptions, characteristics and photos. This
 feature adds a one-off tool that builds such a catalog from public Wildberries data and replaces the invented sample
-with a ~100-product real subset. Research behind the choice of source is in `catalog-dataset-notes.md`.
+with a ~100-product real subset. Research behind the choice of source is in [source-notes.md](source-notes.md).
 
 **In scope**: the catalog build tool; the committed ~100-product subset and its photos; adapting the tests, the smoke
 test and `data/README.md` to the real data; removing the invented-catalog generator.

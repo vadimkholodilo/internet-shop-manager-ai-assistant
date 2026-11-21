@@ -36,10 +36,10 @@ public abstract class ShopTest(ShopStack stack)
     protected ICatalogLoadingClient NewClient() =>
         ShopClientFactory.CreateCatalogLoadingClient(ShopType.OpenCart, new ShopConnection(stack.ShopUrl, ShopStack.ApiKey));
 
-    /// <summary>A sample photo from the repository, for tests that upload one.</summary>
-    protected static string SampleImage => Path.Combine(Repository.Root, "data", "images", "tv-001.png");
+    /// <summary>The test project's own photo, for tests that upload one (independent of the demo catalog).</summary>
+    protected static string SampleImage => TestPhoto.Path;
 
-    protected static TestCatalog NewCatalog() => new(Repository.Root);
+    protected static TestCatalog NewCatalog() => new();
 
     /// <summary>Runs the loader in this process against the test shop (or another address / key, to test failures).</summary>
     protected async Task<LoaderRun> RunLoaderAsync(TestCatalog catalog, string? apiKey = null, string? url = null, int waitSeconds = 60)
@@ -53,7 +53,7 @@ public abstract class ShopTest(ShopStack stack)
         return new LoaderRun(exit, output.ToString(), error.ToString());
     }
 
-    /// <summary>Runs the Native AOT loader image as a container against the test shop, on the generated sample catalog.</summary>
+    /// <summary>Runs the Native AOT loader image as a container against the test shop, on the sample catalog in data/.</summary>
     protected async Task<LoaderRun> RunSampleLoaderContainerAsync()
     {
         await using var loader = new ContainerBuilder(stack.LoaderImage)

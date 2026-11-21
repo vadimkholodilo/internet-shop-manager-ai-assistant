@@ -1,7 +1,7 @@
 # Research: Real Demo Catalog
 
-Source research (rejected sources, card URLs, card fields, noise) is in `catalog-dataset-notes.md` at the repository
-root and is not repeated here. This file records the implementation decisions.
+Source research (rejected sources, card URLs, card fields, noise) is in [source-notes.md](source-notes.md) and is not repeated
+here. This file records the implementation decisions.
 
 ## R1. Stack
 
@@ -75,8 +75,8 @@ root and is not repeated here. This file records the implementation decisions.
 - Attributes: flatten `grouped_options`; a name that occurs in more than one group becomes `<group>: <name>`; names
   are cut to 64 characters, and a collision after cutting keeps the first value. Values are text, trimmed. If a card has
   no `grouped_options`, use `options`.
-- Prices: per-subject range, from `new Random(nm_id)` (seeded `Random` uses the stable legacy algorithm), rounded to
-  end in 90 rubles (e.g. 24 990). Quantity 0–50, with `quantity = 0` for ≈5%.
+- Prices: per-subject range, log-uniform (cheap products are more common), from `new Random(nm_id)` (seeded `Random`
+  uses the stable legacy algorithm), rounded to end in 990 rubles (e.g. 24 990). Quantity 0–50, with `quantity = 0` for ≈5%.
 
   | Subject | Range, ₽ |
   |---------|----------|
@@ -103,3 +103,26 @@ root and is not repeated here. This file records the implementation decisions.
 
 - `--archive` packs the product file and `images/` into `catalog.tar.gz` with `System.Formats.Tar` and `GZipStream`.
   Uploading it to S3 is manual and outside this feature.
+
+## R11. Findings during implementation (2026-11-21)
+
+From the first 300 real cards of `basket-12`:
+
+- **The card's subject can differ from the dump's** (re-filed since 2023: "Наушники беспроводные", "Умные колонки",
+  even "Магнитные доски"). The card decides: aliases map to the eight shop categories, anything else is skipped
+  ("subject changed"). Each category has a **fixed parent** (e.g. Наушники → Телевизоры и аудиотехника), so a child slug
+  never gets two parents.
+- **Key characteristics** are any-of patterns per category plus at least 8 characteristics in total. This drops remotes
+  under TVs, protective glass under smartphones, and books and boards under tablets. Cards with very thin data (a
+  phone with only packaging sizes) are dropped too, on purpose.
+- **Brands**: `selling.brand_name` is missing on some cards (e.g. all portable monitors sampled) or set to "не указан",
+  a store name or a product word. The tool canonicalizes about 90 known manufacturers and aliases (GALAXY → Samsung,
+  маршал → Marshall), takes a manufacturer named in the product name when the brand is unknown (not after "для"/"на"),
+  falls back to the dump's brand, and skips products whose brand is a product or shop word (including Latin look-alike
+  letters such as "HAУШНИКИ").
+- **Near-duplicates**: sellers list colour and memory variants as separate models (eight "Apple MacBook Air 15/M2/…"
+  cards). Products whose names match up to the first "/" or "(" count as one model. With `--limit`, a brand gets at
+  most 3 products per category.
+- **Photo**: `media` is empty on some cards and the photo is then 404: skipped ("no photo"). The card host for
+  `vol1656`/`vol1657` is `basket-12`.
+- Result for the subset: 100 products, 8 categories, 71 brands, about 320 requests (a few minutes), 4.6 MB.

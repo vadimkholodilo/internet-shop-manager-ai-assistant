@@ -26,7 +26,7 @@ public sealed class LoaderTests(ShopStack shop) : ShopTest(shop)
         Assert.NotNull(product.ImageUrl);
         using var photo = await Storefront.GetAsync(new Uri(product.ImageUrl).PathAndQuery);
         Assert.True(photo.IsSuccessStatusCode);
-        Assert.Equal("image/png", photo.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("image/jpeg", photo.Content.Headers.ContentType!.MediaType);
     }
 
     [Fact]

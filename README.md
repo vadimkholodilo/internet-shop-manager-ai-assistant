@@ -25,15 +25,17 @@ Development is spec-driven ([Spec Kit](https://github.com/github/spec-kit)). Eac
 |---|---------|--------|------------|
 | 001 | [Test electronics shop](specs/001-test-shop/spec.md): OpenCart in Docker, JSON product loader, generated sample catalog | Implemented | none |
 | 002 | [Shared shop client library](specs/002-shared-shop-client/spec.md): the shop client moves out of the loader into `src/ShopClient`, behind shop-neutral contracts | Implemented | 001 |
+| 003 | [Real demo catalog](specs/003-real-demo-catalog/spec.md): 100 real electronics products from public Wildberries data replace the generated sample (`tools/build-catalog`) | Implemented | 001 |
 
-Next, once 001 is done: the shop connector, public address, order API and a larger catalog, then the shop AI assistant (product search, ordering, order tracking, handoff, ratings).
+Next: the shop connector, public address and order API, then the shop AI assistant (product search, ordering, order tracking, handoff, ratings).
 Features are specified one at a time.
 
 Not planned yet: voice messages, returns, manager analytics, telephony.
 
 ## Try the test shop
 
-The test shop is an OpenCart electronics store in Russian, seeded with a generated sample catalog. The only
+The test shop is an OpenCart electronics store in Russian, seeded with 100 real electronics products (see
+[`data/README.md`](data/README.md) for the source and terms). The only
 prerequisite is Docker with the Compose plugin.
 
 ```bash
@@ -41,7 +43,7 @@ cp .env.example .env      # optional, the defaults work as they are
 docker-compose up -d
 ```
 
-`up -d` returns once the shop is healthy; the loader then fills it in about 10 seconds
+`up -d` returns once the shop is healthy; the loader then fills it in about half a minute
 (`docker-compose logs -f loader`, it exits with code 0 when done). Then open <http://localhost:8080>.
 Running the command again changes nothing: the loader updates existing items and never duplicates them.
 

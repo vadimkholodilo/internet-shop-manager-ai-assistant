@@ -5,7 +5,7 @@ namespace ShopLoader.IntegrationTests;
 
 /// <summary>
 /// A small product file in a temporary directory, with unique category slugs and SKUs so tests sharing
-/// one shop never interfere. Photos are copies of the generated sample photos.
+/// one shop never interfere. Photos are copies of the test project's own photo.
 /// </summary>
 public sealed class TestCatalog : IDisposable
 {
@@ -22,10 +22,10 @@ public sealed class TestCatalog : IDisposable
 
     public string CategorySlug => $"{Prefix}-cat";
 
-    public TestCatalog(string repositoryRoot)
+    public TestCatalog()
     {
         System.IO.Directory.CreateDirectory(Images);
-        System.IO.File.Copy(Path.Combine(repositoryRoot, "data", "images", "ph-001.png"), Path.Combine(Images, "photo.png"));
+        System.IO.File.Copy(TestPhoto.Path, Path.Combine(Images, "photo.jpg"));
         categories.Add(new JsonObject { ["slug"] = CategorySlug, ["name"] = "Тестовая категория" });
     }
 
@@ -50,7 +50,7 @@ public sealed class TestCatalog : IDisposable
             ["attributes"] = attributes ?? new JsonObject { ["Цвет"] = "Чёрный" },
             ["price"] = price,
             ["quantity"] = quantity,
-            ["image"] = "photo.png",
+            ["image"] = "photo.jpg",
         };
 
     public TestCatalog AddRaw(JsonObject product)

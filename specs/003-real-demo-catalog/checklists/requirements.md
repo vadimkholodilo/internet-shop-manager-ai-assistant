@@ -32,5 +32,5 @@
 ## Notes
 
 - The spec names the data source, file paths and the product file format on purpose: the feature is a data
-  migration whose inputs and outputs are fixed by earlier specs and research (`catalog-dataset-notes.md`).
+  migration whose inputs and outputs are fixed by earlier specs and research ([source-notes.md](source-notes.md)).
 - Stack choice (.NET vs Python with `uv`) is deferred to the plan.

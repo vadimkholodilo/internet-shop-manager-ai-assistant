@@ -1,15 +1,35 @@
-# Sample data
+# Demo catalog
 
-`sample-catalog.json` is the demo catalog the shop is seeded with. It is **generated** by
-[`tools/generate-sample/generate.cs`](../tools/generate-sample/generate.cs): all brands and products are invented,
-and nothing is copied from a real retailer. The photos in `images/` are placeholder pictures drawn by the same
-generator, so there are no third-party image licences to worry about.
+`sample-catalog.json` is the catalog the demo shop is seeded with: 100 real electronics products (smartphones,
+laptops, tablets, TVs, monitors, headphones, speakers, smart watches) with their Russian names, descriptions,
+characteristics and main photos in `images/`.
 
-Regenerate (the output is deterministic):
+## Source and terms
+
+- **Index**: the Hugging Face dataset [`nyuuzyou/wb-products`](https://huggingface.co/datasets/nyuuzyou/wb-products),
+  a dump of Wildberries products collected in about 2023, published under CC0 (public domain).
+- **Details**: Wildberries' public product card files (`card.json`) and main photos, fetched in November 2026 at one
+  request per second.
+- **Prices and stock are generated** (random but reproducible per product); they are not Wildberries prices.
+
+The catalog is used only for a **non-commercial demo** of this project. Product texts and photos belong to their
+owners (Wildberries and its sellers). Brand names are as the sellers entered them, so a few are store names rather than
+manufacturers, and typos in characteristics are kept as they are. If you own any of this content and want it removed,
+open an issue and it will be removed.
+
+## Rebuild
+
+The catalog is built by [`tools/build-catalog/build-catalog.cs`](../tools/build-catalog/build-catalog.cs); see
+[its contract](../specs/003-real-demo-catalog/contracts/build-catalog-cli.md). From the repository root:
 
 ```bash
-dotnet run tools/generate-sample/generate.cs
+dotnet run tools/build-catalog/build-catalog.cs -- --limit 100 --out out/subset
+cp out/subset/catalog.json data/sample-catalog.json && rm -rf data/images && cp -r out/subset/images data/images
 ```
+
+Cards and photos are cached in `.cache/build-catalog/`, so a re-run makes no requests for products it already has and
+gives the same file. Without `--limit` the tool builds the full set (a few thousand products with `--dumps 9-12`),
+which is kept outside the repository.
 
 ## File format
 
@@ -17,23 +37,23 @@ The format is described by [`product-file.schema.json`](../specs/001-test-shop/c
 
 ```json
 {
-  "generated": true,
+  "generated": false,
   "source": "where the data came from",
   "categories": [
-    { "slug": "electronics", "name": "Электроника" },
-    { "slug": "smartphones", "name": "Смартфоны", "parent": "electronics" }
+    { "slug": "smartfony-i-aksessuary", "name": "Смартфоны и аксессуары" },
+    { "slug": "smartfony", "name": "Смартфоны", "parent": "smartfony-i-aksessuary" }
   ],
   "products": [
     {
-      "sku": "PH-001",
-      "name": "Смартфон Norda Pulse 5 128 ГБ",
-      "category": "smartphones",
-      "brand": "Norda",
-      "description": "Компактный смартфон для повседневных задач.",
-      "attributes": { "Память": "128 ГБ", "Диагональ экрана": "6.1\"" },
+      "sku": "WB-165725653",
+      "name": "Смартфон Redmi Note 12 6GB+128GB",
+      "category": "smartfony",
+      "brand": "Xiaomi",
+      "description": "Описание из карточки товара.",
+      "attributes": { "Диагональ экрана": "6.67\"", "Емкость аккумулятора (мА/ч)": "5000 мА*ч" },
       "price": 24990,
       "quantity": 14,
-      "image": "ph-001.png"
+      "image": "wb-165725653.jpg"
     }
   ]
 }

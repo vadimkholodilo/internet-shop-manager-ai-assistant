@@ -8,6 +8,9 @@ cd "$(dirname "$0")/.."
 set -a; . ./.env; set +a
 PORT="${SHOP_PORT:-8080}"
 KEY="${SHOP_API_KEY:-local-demo-api-key-change-me}"
+# Expectations come from the demo catalog: its product count and a brand that needs no URL encoding.
+EXPECTED=$(grep -c '"sku":' data/sample-catalog.json)
+BRAND=$(grep -o '"brand": "[A-Za-z0-9]*"' data/sample-catalog.json | head -1 | sed 's/.*: "\(.*\)"/\1/')
 
 cleanup() {
     status=$?
@@ -32,11 +35,11 @@ code=$(docker compose ps -a loader --format '{{.ExitCode}}')
 echo "seeded in $(( $(date +%s) - start )) seconds"
 
 total=$(curl -fsS -H "Authorization: Bearer $KEY" "http://localhost:$PORT/catalog-api/products" | grep -o '"total":[0-9]*' | cut -d: -f2)
-[ "${total:-0}" -ge 20 ] || { echo "expected at least 20 products, found ${total:-0}"; exit 1; }
+[ "${total:-0}" -ge "$EXPECTED" ] || { echo "expected at least $EXPECTED products, found ${total:-0}"; exit 1; }
 
 home=$(curl -fsS "http://localhost:$PORT/")
 grep -q 'lang="ru"' <<<"$home" || { echo "storefront is not in Russian"; exit 1; }
-results=$(curl -fsS "http://localhost:$PORT/index.php?route=product/search&search=Norda&language=ru-ru")
+results=$(curl -fsS "http://localhost:$PORT/index.php?route=product/search&search=$BRAND&language=ru-ru")
 grep -q '₽' <<<"$results" || { echo "no prices in rubles"; exit 1; }
 
 echo "second 'docker compose up -d' must create nothing new"
