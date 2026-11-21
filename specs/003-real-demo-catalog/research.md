@@ -122,7 +122,11 @@ From the first 300 real cards of `basket-12`:
   letters such as "HAУШНИКИ").
 - **Near-duplicates**: sellers list colour and memory variants as separate models (eight "Apple MacBook Air 15/M2/…"
   cards). Products whose names match up to the first "/" or "(" count as one model. With `--limit`, a brand gets at
-  most 3 products per category.
+  most a tenth of a category's share (at least 3): 3 for 100 products, 38 for 3000. A fixed cap of 3 made the first
+  3000-product run reject most fetched cards (about 15 requests per accepted product instead of 3).
 - **Photo**: `media` is empty on some cards and the photo is then 404: skipped ("no photo"). The card host for
   `vol1656`/`vol1657` is `basket-12`.
 - Result for the subset: 100 products, 8 categories, 71 brands, about 320 requests (a few minutes), 4.6 MB.
+- Result for the full set (`--dumps 11-12 --limit 3000 --archive`): 3000 products, 8 categories, 937 brands, 133 out
+  of stock, 13 545 cached cards, 132 MB (116 MB archive). It loads into a fresh shop in 81 seconds with 0 failed
+  records.
