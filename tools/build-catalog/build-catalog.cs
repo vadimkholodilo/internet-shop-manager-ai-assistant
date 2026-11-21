@@ -58,6 +58,8 @@ var selected = new List<Product>();
 var queues = Subjects.All.ToDictionary(
     s => s.Name,
     s => candidates.Where(c => c.Subject == s.Name).OrderBy(c => Spread(c.NmId)).ThenBy(c => c.NmId).ToList());
+var models = new HashSet<string>();
+const int MaxPerBrand = 3; // per subject, with --limit
 var brandsTaken = Subjects.All.ToDictionary(s => s.Name, _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase));
 
 while (queues.Values.Any(q => q.Count > 0) && (options.Limit is null || selected.Count < options.Limit))
@@ -76,6 +78,15 @@ while (queues.Values.Any(q => q.Count > 0) && (options.Limit is null || selected
             var candidate = queue[index];
             queue.RemoveAt(index);
             var (product, reason) = await Mapper.TryBuildAsync(candidate, wildberries);
+            if (product is not null && !models.Add(ModelKey(product.Name)))
+            {
+                (product, reason) = (null, "same model");
+            }
+            if (product is not null && options.Limit is not null &&
+                selected.Count(p => p.Category == product.Category && string.Equals(p.Brand, product.Brand, StringComparison.OrdinalIgnoreCase)) >= MaxPerBrand)
+            {
+                (product, reason) = (null, "brand quota");
+            }
             if (product is null)
             {
                 skipped[reason!] = skipped.GetValueOrDefault(reason!) + 1;
@@ -144,6 +155,10 @@ return 0;
 
 void PrintSkipped() =>
     Console.WriteLine($"Skipped: {(skipped.Count == 0 ? "none" : string.Join(", ", skipped.Select(s => $"{s.Key} {s.Value}")))}");
+
+// Sellers list colour and memory variants as separate models ("MacBook Air 15/M2/8/256 (Silver)"): compare names up
+// to the first "/" or "(".
+static string ModelKey(string name) => Regex.Replace(name.Split('/', '(')[0], @"\s+", " ").Trim().ToLowerInvariant();
 
 // A stable spread of product IDs (string.GetHashCode is randomized per process).
 static uint Spread(long nmId) => unchecked((uint)nmId * 2654435761u);
@@ -221,7 +236,7 @@ static class Subjects
     // Key characteristics were taken from real cards (2026-11-21); prices are plausible demo ranges in rubles.
     public static readonly Subject[] All =
     [
-        new("Смартфоны", "Смартфоны и аксессуары", [], 8_000, 150_000, ["^Диагональ", "памят", "аккумулятор"]),
+        new("Смартфоны", "Смартфоны и аксессуары", [], 8_000, 150_000, ["^Диагональ", "памят|Процессор|SIM", "аккумулятор"]),
         new("Ноутбуки", "Ноутбуки и компьютеры", [], 30_000, 250_000, ["^Процессор|Линейка процессоров", "оперативной памяти", "Разрешение экрана|^Диагональ"]),
         new("Планшеты", "Смартфоны и аксессуары", [], 10_000, 120_000, ["^Диагональ", "памят", "Операционная система|Версия операционной системы|Процессор"]),
         new("Телевизоры", "Телевизоры и аудиотехника", [], 15_000, 200_000, ["^Диагональ", "Разрешение экрана", "HDMI|Операционная система|Smart"]),
@@ -511,10 +526,6 @@ static class Mapper
     const int MaxName = 255;
     const int MaxShortName = 64;
     const int MinCharacteristics = 8;
-    static readonly HashSet<string> NoBrand = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "", "не указан", "нет бренда", "без бренда", "noname", "no name", "no brand", "нет",
-    };
 
     /// <summary>The product for a candidate, or null and the reason it was skipped.</summary>
     public static async Task<(Product? Product, string? Reason)> TryBuildAsync(Candidate candidate, Wildberries wildberries)
@@ -530,16 +541,13 @@ static class Mapper
         {
             return (null, "subject changed");
         }
-        var brand = Clean(Text(root, "selling", "brand_name"));
-        if (NoBrand.Contains(brand))
-        {
-            brand = Clean(candidate.DumpBrand);
-        }
-        if (NoBrand.Contains(brand) || Encoded(brand) > MaxShortName)
+        var name = Clean(Text(root, "imt_name"));
+        var brand = Brands.Normalize(Clean(Text(root, "selling", "brand_name")), name)
+                    ?? Brands.Normalize(Clean(candidate.DumpBrand), name);
+        if (brand is null || Encoded(brand) > MaxShortName)
         {
             return (null, "no brand");
         }
-        var name = Clean(Text(root, "imt_name"));
         var description = Clean(Text(root, "description"));
         if (name.Length == 0 || description.Length == 0)
         {
@@ -556,7 +564,8 @@ static class Mapper
         }
 
         var random = new Random((int)(candidate.NmId % int.MaxValue));
-        var price = random.Next(subject.MinPrice / 1000, subject.MaxPrice / 1000 + 1) * 1000 - 10;
+        // Log-uniform, so cheap products are more common than expensive ones, as in a real shop.
+        var price = (int)Math.Round(Math.Exp(double.Lerp(Math.Log(subject.MinPrice), Math.Log(subject.MaxPrice), random.NextDouble())) / 1000) * 1000 - 10;
         var quantity = random.Next(100) < 5 ? 0 : random.Next(1, 51);
         return (new Product(candidate.NmId, $"WB-{candidate.NmId}", Cut(name, MaxName), subject.Slug, brand,
                             description, attributes, price, quantity, $"wb-{candidate.NmId}.jpg"), null);
@@ -622,6 +631,72 @@ static class Mapper
     }
 }
 
+/// <summary>
+/// Marketplace brands are what sellers typed: store names, "GALAXY" for Samsung, "не указан". Known manufacturers are
+/// written the usual way; an unknown brand gives way to a manufacturer named in the product name (but not after
+/// "для"/"на", as in "чехол для iPhone"); a brand that is a product or shop word is no brand.
+/// </summary>
+static class Brands
+{
+    static readonly string[] Known =
+    [
+        "Apple", "Samsung", "Xiaomi", "Huawei", "Honor", "Realme", "OPPO", "vivo", "Tecno", "Infinix", "Nokia", "Motorola",
+        "OnePlus", "Google", "Sony", "LG", "TCL", "Hisense", "Haier", "Philips", "JBL", "Marshall", "Bang & Olufsen",
+        "Harman Kardon", "Яндекс", "VK", "Lenovo", "Acer", "ASUS", "HP", "Dell", "MSI", "Gigabyte", "AOC", "BenQ",
+        "ViewSonic", "Garmin", "Amazfit", "Fitbit", "Jabra", "Sennheiser", "Beats", "Edifier", "Defender", "SVEN", "Digma",
+        "Prestigio", "Irbis", "Blackview", "Doogee", "Ulefone", "Oukitel", "Cubot", "Meizu", "ZTE", "Nothing", "Hyundai",
+        "Thomson", "BBK", "Polarline", "Starwind", "Renova", "KIVI", "Toshiba", "Panasonic", "Sharp", "Razer", "Logitech",
+        "HyperX", "SteelSeries", "Redmi", "POCO", "Borofone", "Hoco", "Baseus", "Anker", "Soundcore", "Mibro", "Aimoto",
+        "Elari", "Haylou", "QCY", "Machenike", "Ninkear", "Chuwi", "Teclast", "Alldocube", "Jumper", "Mediacom",
+        "Sber", "Hiper", "Leff", "Skyworth",
+    ];
+
+    static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Galaxy"] = "Samsung", ["Samsung Galaxy"] = "Samsung", ["Mi"] = "Xiaomi", ["Xiaomi Mi"] = "Xiaomi",
+        ["Yandex"] = "Яндекс", ["маршал"] = "Marshall", ["bang olufsen"] = "Bang & Olufsen", ["Xiaom"] = "Xiaomi", ["Яндекс Станция"] = "Яндекс", ["Huawei Honor"] = "Honor", ["Asus ROG"] = "ASUS",
+    };
+
+    static readonly string[] NotBrands =
+    [
+        "не указан", "нет бренда", "без бренда", "noname", "no name", "no brand", "нет", "tws", "smart watch", "smart",
+    ];
+
+    static readonly Regex ProductWord = new("наушник|колонк|смартфон|телефон|часы|телевизор|планшет|ноутбук|монитор|акустик|гаджет|" +
+                                            "магазин|менеджер|мелочи|техник|shop|store|group|market|trade|smart ?watch",
+        RegexOptions.IgnoreCase);
+
+    public static string? Normalize(string brand, string name)
+    {
+        var known = Canonical(brand);
+        if (known is not null)
+        {
+            return known;
+        }
+        var fromName = Known.Concat(Aliases.Keys)
+            .Select(k => (Key: k, Match: Regex.Match(name, $@"(?<![\p{{L}}\d])(?<!(для|на|for) ){Regex.Escape(k)}(?![\p{{L}}\d])", RegexOptions.IgnoreCase)))
+            .Where(m => m.Match.Success)
+            .OrderBy(m => m.Match.Index)
+            .ThenByDescending(m => m.Key.Length)
+            .Select(m => Canonical(m.Key))
+            .FirstOrDefault();
+        if (fromName is not null)
+        {
+            return fromName;
+        }
+        return brand.Length < 2 || NotBrands.Contains(brand, StringComparer.OrdinalIgnoreCase) ||
+               ProductWord.IsMatch(brand) || ProductWord.IsMatch(Cyrillic(brand)) ? null : brand;
+    }
+
+    // "HAУШНИКИ": Latin letters that look Cyrillic, written as Cyrillic for the product-word check.
+    static string Cyrillic(string text) =>
+        string.Concat(text.ToUpperInvariant().Select(c => "ABCEHKMOPTXY".IndexOf(c) is var i and >= 0 ? "АВСЕНКМОРТХУ"[i] : c));
+
+    static string? Canonical(string brand) =>
+        Aliases.TryGetValue(brand, out var alias) ? alias
+        : Known.FirstOrDefault(k => string.Equals(k, brand, StringComparison.OrdinalIgnoreCase));
+}
+
 static class Photos
 {
     const int LongSide = 800;
@@ -681,7 +756,7 @@ static class Output
     public static List<string> Check(JsonObject document, List<Category> categories, List<Product> products, int? limit)
     {
         var problems = new List<string>();
-        var schema = JsonSchema.FromFile(Schema);
+        var schema = JsonSchema.FromFile(Path.GetFullPath(Schema));
         var result = schema.Evaluate(JsonDocument.Parse(document.ToJsonString()).RootElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
         if (!result.IsValid)
         {
