@@ -36,8 +36,9 @@ or script mentions Norda or `PH-001`.
 ## 4. Full set (optional)
 
 ```bash
-dotnet run tools/build-catalog/build-catalog.cs -- --dumps 9-12 --out out/full --archive
+dotnet run tools/build-catalog/build-catalog.cs -- --dumps 11-12 --limit 3000 --out out/full --archive
 ```
 
-Expected: a few thousand products and `out/full/catalog.tar.gz`, which loads with the existing loader:
+Expected: 3000 products (about 10 000 requests, under 3 hours with a cold cache) and `out/full/catalog.tar.gz`,
+which loads with the existing loader:
 `--file out/full/catalog.json --images-dir out/full/images`.

@@ -63,7 +63,7 @@ Wildberries requests and gives identical output.
 ## Phase 4: Polish
 
 - [X] T021 Move the repository-root `catalog-dataset-notes.md` to [source-notes.md](source-notes.md), record implementation findings in research.md R11, and update the project memory note that points to it
-- [ ] T022 Optional: run quickstart step 4 (full set with `--dumps 9-12 --archive`) and hand the archive to the user for S3
+- [ ] T022 Optional: run quickstart step 4 (full set with `--dumps 11-12 --limit 3000 --archive`; `basket-11` alone has about 27 000 models) and hand the archive to the user for S3
 
 ## Dependencies
 

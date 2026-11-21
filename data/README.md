@@ -28,8 +28,8 @@ cp out/subset/catalog.json data/sample-catalog.json && rm -rf data/images && cp 
 ```
 
 Cards and photos are cached in `.cache/build-catalog/`, so a re-run makes no requests for products it already has and
-gives the same file. Without `--limit` the tool builds the full set (a few thousand products with `--dumps 9-12`),
-which is kept outside the repository.
+gives the same file. The full set (3000 products: `--dumps 11-12 --limit 3000 --archive`) is kept outside the
+repository.
 
 ## File format
 
