@@ -59,7 +59,8 @@ var queues = Subjects.All.ToDictionary(
     s => s.Name,
     s => candidates.Where(c => c.Subject == s.Name).OrderBy(c => Spread(c.NmId)).ThenBy(c => c.NmId).ToList());
 var models = new HashSet<string>();
-const int MaxPerBrand = 3; // per subject, with --limit
+// With --limit, a brand gets at most a tenth of a subject's share (at least 3): 3 for 100 products, 38 for 3000.
+var maxPerBrand = Math.Max(3, (int)Math.Ceiling((options.Limit ?? 0) / (double)Subjects.All.Length / 10));
 var brandsTaken = Subjects.All.ToDictionary(s => s.Name, _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase));
 
 while (queues.Values.Any(q => q.Count > 0) && (options.Limit is null || selected.Count < options.Limit))
@@ -83,7 +84,7 @@ while (queues.Values.Any(q => q.Count > 0) && (options.Limit is null || selected
                 (product, reason) = (null, "same model");
             }
             if (product is not null && options.Limit is not null &&
-                selected.Count(p => p.Category == product.Category && string.Equals(p.Brand, product.Brand, StringComparison.OrdinalIgnoreCase)) >= MaxPerBrand)
+                selected.Count(p => p.Category == product.Category && string.Equals(p.Brand, product.Brand, StringComparison.OrdinalIgnoreCase)) >= maxPerBrand)
             {
                 (product, reason) = (null, "brand quota");
             }
